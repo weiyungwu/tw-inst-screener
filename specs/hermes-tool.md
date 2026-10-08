@@ -74,7 +74,10 @@
 
 `GET /api/stock/{code}`（4 位數普通股代號）。查無此檔（ETF、權證、下市或代號錯誤）時回 `404 { "error": "not_found" }`。
 
-回應包含 `score`、`stage`、`breakdown`、`signals`、`features`、`close`，以及 `series`（近 20 個交易日的 `date`、`inst_net`、`close`、`volume`）。只要是有資料的普通股都查得到，包含 `NEUTRAL`、`EXCLUDED`。
+回應包含 `score`、`stage`、`breakdown`、`signals`、`features`、`close`、`levels`、`series`。只要是有資料的普通股都查得到，包含 `NEUTRAL`、`EXCLUDED`。
+
+- `levels`（程式算好的價位，給分析報告用，不參與評分）：`close`、`prev_close`、`ma5`、`ma10`、`ma20`、`ma60`、`high_20`、`low_20`、`high_60`、`low_60`（元）；`volume`、`vol_ma5`、`vol_ma20`（**股**）。
+- `series`（近 20 個交易日，由舊到新）：`date`、`open`、`high`、`low`、`close`（元）、`volume`（股）、`inst_net`（外資＋投信）、`foreign_net`、`trust_net`、`dealer_net`（**股**）、`margin_balance`（融資餘額，**張**）。
 
 ### features 單位對照（解讀時最容易出錯）
 
@@ -90,7 +93,9 @@
 | `big400_up_weeks` | 週 | 大戶比例連續週增週數 |
 | `big400_chg_4w`、`retail_chg_4w` | 百分點 | 4 週變化 |
 | `holders` | 人 | 集保股東人數 |
-| `series[].inst_net` | **股**（不是張） | 每日外資＋投信淨買超 |
+| `series[].inst_net`、`foreign_net`、`trust_net`、`dealer_net` | **股**（不是張） | 每日法人淨買超 |
+| `series[].volume`、`levels.volume`、`vol_ma5`、`vol_ma20` | **股** | 成交量 |
+| `series[].margin_balance` | 張 | 融資餘額 |
 
 `null` 代表資料不足（停牌、新上市、不能融資、集保週數不夠），**不可當成 0**。對應的 `signals` 會有 `missing:<特徵名>`。
 
@@ -188,6 +193,7 @@ async function call(name, args) {
   → `tw_scan({ limit: 10 })`
 - 「法人同步買超和吸籌清單有哪些重疊？逐檔分析。」
   → `tw_cobuy({})` ＋ `tw_scan({ stage: ["ACCUMULATION","WATCH"], limit: 200 })` 取交集，再對每檔 `tw_stock`
+- 要產出完整的分析報告時，建議改用 Hermes skill `specs/台股籌碼資料_Skill_v1.1.md` 抓資料，再交給 `stock-4d-3d-trade-report` 產生報告。
 - 「3481 最近籌碼怎麼樣？」
   → `tw_stock({ code: "3481" })`
 

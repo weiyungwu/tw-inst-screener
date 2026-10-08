@@ -13,7 +13,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { nowTaipei } from '../lib/dates.mjs';
 import { openDb, tx, upsertStmt } from '../lib/db.mjs';
-import { computeFeatures } from '../lib/features.mjs';
+import { computeFeatures, priceLevels } from '../lib/features.mjs';
 import { scoreStock, CONFIG } from '../lib/score.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -84,11 +84,21 @@ function main() {
       days, inst: i, price: p, margin: margin.get(s.code) ?? empty, qfii: qfii.get(s.code) ?? empty, tdcc: tdcc.get(s.code) ?? [],
     });
     const scored = scoreStock(features);
+    const m = margin.get(s.code) ?? empty;
+    // 近 20 日序列:法人單位為股、融資餘額單位為張(官方單位);沒有法人列但有行情 = 當日法人 0(同 features)
     const series = days.slice(-SERIES_DAYS).map((d) => {
-      const r = i.get(d) ?? (p.has(d) ? { foreign_net: 0, trust_net: 0 } : null);
-      return { date: d, inst_net: r ? r.foreign_net + r.trust_net : null, close: p.get(d)?.close ?? null, volume: p.get(d)?.volume ?? null };
+      const r = i.get(d) ?? (p.has(d) ? { foreign_net: 0, trust_net: 0, dealer_net: 0 } : null);
+      const px = p.get(d);
+      return {
+        date: d,
+        inst_net: r ? r.foreign_net + r.trust_net : null,
+        foreign_net: r?.foreign_net ?? null, trust_net: r?.trust_net ?? null, dealer_net: r?.dealer_net ?? null,
+        open: px?.open ?? null, high: px?.high ?? null, low: px?.low ?? null, close: px?.close ?? null, volume: px?.volume ?? null,
+        margin_balance: m.get(d)?.margin_balance ?? null,
+      };
     });
-    results.push({ ...s, ...scored, features: roundAll(features), close: p.get(t)?.close ?? null, series });
+    const levels = roundAll(priceLevels({ days, price: p }));
+    results.push({ ...s, ...scored, features: roundAll(features), close: p.get(t)?.close ?? null, levels, series });
   }
 
   // scan_daily:全部個股
@@ -117,7 +127,7 @@ function main() {
   const published = results
     .filter((r) => PUBLISHED.includes(r.stage))
     .sort((a, b) => PUBLISHED.indexOf(a.stage) - PUBLISHED.indexOf(b.stage) || b.score - a.score || a.code.localeCompare(b.code))
-    .map(({ series, ...r }) => r);
+    .map(({ series, levels, ...r }) => r); // scan.json 只放清單需要的欄位;明細在 features 分片
   mkdirSync(dirname(SCAN_PATH), { recursive: true });
   writeFileSync(SCAN_PATH, JSON.stringify({ ...meta, counts, stocks: published, note: '僅供研究參考，非投資建議。' }));
 
