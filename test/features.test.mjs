@@ -135,3 +135,13 @@ test('價位與均線:MA、5 日均量、區間高低點由程式算好,下游�
   assert.equal(short.high_60, null);
   assert.notEqual(short.ma20, null);
 });
+
+test('融資基數太小(t−20 < 100 張)時融資變化為 null,避免 3 張變 9 張被當成 +200%', () => {
+  const s = series(25);
+  s.margin.set('d05', { margin_balance: 99 });
+  s.margin.set('d25', { margin_balance: 297 });
+  assert.equal(computeFeatures(s).margin_chg_20, null);
+
+  s.margin.set('d05', { margin_balance: 100 }); // 剛好達門檻就照算
+  near(computeFeatures(s).margin_chg_20, 297 / 100 - 1, 'margin_chg_20');
+});
