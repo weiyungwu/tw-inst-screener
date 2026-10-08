@@ -111,3 +111,27 @@ test('集保:連續週增週數、4 週變化;週數不足時為 null', () => {
   assert.equal(tdccFeatures([w(50, 1000), w(50, 990)]).big400_up_weeks, 0); // 持平不算增加
   assert.equal(tdccFeatures([]).tdcc_weeks, 0);
 });
+
+test('價位與均線:MA、5 日均量、區間高低點由程式算好,下游報告不必讓模型心算', async () => {
+  const { priceLevels } = await import('../lib/features.mjs');
+  const s = series(65, { volOf: (i) => 1000 + i });
+  const L = priceLevels(s);
+  assert.equal(L.close, 164);
+  assert.equal(L.prev_close, 163);
+  near(L.ma5, (160 + 164) / 2, 'ma5');
+  near(L.ma10, (155 + 164) / 2, 'ma10');
+  near(L.ma20, (145 + 164) / 2, 'ma20');
+  near(L.ma60, (105 + 164) / 2, 'ma60');
+  assert.equal(L.volume, 1064);
+  near(L.vol_ma5, (1060 + 1064) / 2, 'vol_ma5');
+  assert.equal(L.high_20, 165); // close + 1
+  assert.equal(L.low_20, 144); // D20 第一天 close 145 − 1
+  assert.equal(L.high_60, 165);
+  assert.equal(L.low_60, 104);
+
+  // 只有 25 天:60 日類為 null,不可用 25 天湊
+  const short = priceLevels(series(25));
+  assert.equal(short.ma60, null);
+  assert.equal(short.high_60, null);
+  assert.notEqual(short.ma20, null);
+});

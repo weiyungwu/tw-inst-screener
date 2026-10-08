@@ -64,6 +64,8 @@ node scripts/verify.mjs         # 列印目前符合條件的股票(自我檢查
   - `GET /scan.json`:今日 ACCUMULATION / WATCH / OVERHEATED 清單
   - `GET /api/scan?stage=ACCUMULATION,WATCH&min_score=50&market=TPEX&limit=50`
   - `GET /api/stock/2330`:單檔完整特徵、分數與近 20 日序列(依代號前兩碼讀 `features/23.json`)
+  - `GET /api/cobuy?days=10&streak=5&insts=foreign,trust&market=TPEX&sort=foreign&limit=50`:法人同步買超,篩選規則與首頁相同(單位張)
+  - Hermes Agent 等 agent 的工具定義與系統提示見 [specs/hermes-tool.md](specs/hermes-tool.md)
 
 ```bash
 # 本機(建議先 export TZ=Asia/Taipei)
