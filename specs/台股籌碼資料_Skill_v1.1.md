@@ -99,10 +99,10 @@
 欄位為 `null` 代表資料不足（停牌、新上市、不能融資、集保週數不夠）。**一律寫「資料不足」，不可寫 0，也不可推論。**
 
 ### 訊號標籤中文對照
-`inst_steady_buy` 法人緩買、`trust_buying` 投信買超、`big_holder_rising` 大戶連增、`holders_declining` 股東減少、`price_quiet` 價格未動、`box_compression` 箱型收斂、`volume_mild` 量能溫和、`margin_exit` 融資退場、`overheated` 過熱、`tdcc_warming_up` 集保資料累積中、`missing:<欄位>` 該欄位資料不足。
+`inst_steady_buy` 法人緩買、`trust_buying` 投信買超、`big_holder_rising` 大戶連增、`holders_declining` 股東人數 4 週減少超過 2%、`price_quiet` 價格未動、`box_compression` 箱型收斂、`volume_mild` 量能溫和、`margin_exit` 融資退場、`overheated` 過熱、`tdcc_warming_up` 集保資料累積中、`missing:<欄位>` 該欄位資料不足。
 
 ### 階段中文對照
-`ACCUMULATION` 吸籌（≥ 60 分）、`WATCH` 觀察（45～59 分）、`OVERHEATED` 過熱（20 日漲幅 > 25% 或量比 > 2.5）、`NEUTRAL` 中性、`EXCLUDED` 排除（20 日平均成交值 < 2,000 萬元或資料不足）。
+`ACCUMULATION` 吸籌（≥ 70 分）、`WATCH` 觀察（55～69 分）、`OVERHEATED` 過熱（20 日漲幅 > 25% 或量比 > 2.5）、`NEUTRAL` 中性、`EXCLUDED` 排除（20 日平均成交值 < 2,000 萬元或資料不足）。
 
 ---
 

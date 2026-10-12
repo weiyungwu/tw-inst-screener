@@ -60,7 +60,7 @@
 
 | 參數 | 預設 | 說明 |
 |---|---|---|
-| `stage` | `ACCUMULATION` | 逗號分隔：`ACCUMULATION` 吸籌（≥ 60 分）、`WATCH` 觀察（45～59 分）、`OVERHEATED` 過熱（20 日漲幅 > 25% 或量比 > 2.5，不論分數） |
+| `stage` | `ACCUMULATION` | 逗號分隔：`ACCUMULATION` 吸籌（≥ 70 分）、`WATCH` 觀察（55～69 分）、`OVERHEATED` 過熱（20 日漲幅 > 25% 或量比 > 2.5，不論分數） |
 | `min_score` | 0 | 最低分數 |
 | `market` | 全部 | `TWSE`、`TPEX` |
 | `limit` | 50 | 最多 200 |
