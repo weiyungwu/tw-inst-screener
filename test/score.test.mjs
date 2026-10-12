@@ -52,7 +52,9 @@ test('集保只有 1 週 → tdcc_warming_up,籌碼集中只拿得到部分分�
   assert.ok(r.breakdown.concentration < 30);
   for (const k of ['big400_up_weeks', 'holders_chg_4w_pct', 'big400_chg_4w']) assert.ok(r.signals.includes(`missing:${k}`), k);
   assert.equal(r.score, 94 - 30);
-  assert.equal(r.stage, 'ACCUMULATION'); // 其他四群組滿分 64 仍達門檻
+  // v1.1 吸籌門檻 70:集保資料不足時只能靠其他四群組(本例 64 分)→ 觀察,
+  // 沒有籌碼集中的證據就不列入吸籌
+  assert.equal(r.stage, 'WATCH');
 });
 
 test('級距邊界:法人 % 與買超天數、量比、融資都依規格的 ≥ / < 判斷', () => {
@@ -69,13 +71,27 @@ test('級距邊界:法人 % 與買超天數、量比、融資都依規格的 ≥
   assert.equal(s({ ret_20: -0.06 }).price, 10);
 });
 
-test('分數落在 45~59 → WATCH;低於 45 → NEUTRAL', () => {
-  // 集保與融資都沒加分:法人 24 + 價格 20 + 量能 10 = 54
+test('v1.1 階段門檻:≥ 70 吸籌、55~69 觀察、< 55 中性', () => {
+  // 集保與融資都沒加分:法人 24 + 價格 20 + 量能 10 = 54 → 中性
   const base = { ...accumulation, big400_up_weeks: 0, holders_chg_4w_pct: 0.01, big400_chg_4w: 0, margin_chg_20: 0.1 };
-  const watch = scoreStock(base);
-  assert.equal(watch.score, 54);
-  assert.equal(watch.stage, 'WATCH');
-  const neutral = scoreStock({ ...base, vol_ratio: 2.0 }); // 量能 0 → 44
-  assert.equal(neutral.score, 44);
+  const neutral = scoreStock(base);
+  assert.equal(neutral.score, 54);
   assert.equal(neutral.stage, 'NEUTRAL');
+  const watch = scoreStock({ ...base, margin_chg_20: -0.064 }); // 融資 +10 → 64
+  assert.equal(watch.score, 64);
+  assert.equal(watch.stage, 'WATCH');
+  const acc = scoreStock({ ...base, margin_chg_20: -0.064, big400_up_weeks: 2 }); // 大戶連增 2 週 +8 → 72
+  assert.equal(acc.score, 72);
+  assert.equal(acc.stage, 'ACCUMULATION');
+  assert.equal(scoreStock({ ...base, margin_chg_20: -0.064, big400_up_weeks: 2, inst_buy_days_20: 10 }).score, 67); // 買超天數降到 10 天(法人 −5)→ 67,回到觀察
+});
+
+test('股東人數要減少超過 2% 才算籌碼集中(小幅減少是全市場普遍現象,沒有分辨力)', () => {
+  const r = (hc) => scoreStock({ ...accumulation, holders_chg_4w_pct: hc });
+  for (const hc of [-0.01, -0.02, 0]) {
+    assert.equal(r(hc).breakdown.concentration, 15 + 5, `${hc}`);
+    assert.equal(r(hc).signals.includes('holders_declining'), false, `${hc}`);
+  }
+  assert.equal(r(-0.021).breakdown.concentration, 15 + 10 + 5);
+  assert.ok(r(-0.021).signals.includes('holders_declining'));
 });
