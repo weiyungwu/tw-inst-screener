@@ -15,6 +15,7 @@ import { nowTaipei } from '../lib/dates.mjs';
 import { openDb, tx, upsertStmt } from '../lib/db.mjs';
 import { computeFeatures, priceLevels } from '../lib/features.mjs';
 import { scoreStock, CONFIG } from '../lib/score.mjs';
+import { fourD } from '../lib/fourd.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DB_PATH = process.env.DB_PATH ?? join(ROOT, 'data', 'history.sqlite');
@@ -97,8 +98,9 @@ function main() {
         margin_balance: m.get(d)?.margin_balance ?? null,
       };
     });
-    const levels = roundAll(priceLevels({ days, price: p }));
-    results.push({ ...s, ...scored, features: roundAll(features), close: p.get(t)?.close ?? null, levels, series });
+    const levels = priceLevels({ days, price: p });
+    const lights = fourD({ features, levels }); // 用未四捨五入的值判斷,避免進位改變燈號
+    results.push({ ...s, ...scored, features: roundAll(features), close: p.get(t)?.close ?? null, levels: roundAll(levels), lights, series });
   }
 
   // scan_daily:全部個股

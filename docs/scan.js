@@ -35,6 +35,7 @@ const COLS = [
   { key: 'ret_20', label: '20日漲幅', num: true, html: (s, f) => `<td class="${cls(f.ret_20)}">${pct(f.ret_20)}</td>` },
   { key: 'vol_ratio', label: '量比', num: true, html: (s, f) => `<td>${num(f.vol_ratio)}</td>` },
   { key: 'margin_chg_20', label: '融資20日', num: true, html: (s, f) => `<td class="${cls(f.margin_chg_20)}">${pct(f.margin_chg_20)}</td>` },
+  { key: 'lights', label: '四維', num: true, get: (s) => s.lights?.red, html: (s) => `<td class="lights">${lightDots(s.lights)}</td>` },
   { key: 'signals', label: '訊號', html: (s) => `<td class="sigs">${signalTags(s.signals)}</td>` },
 ];
 
@@ -47,6 +48,14 @@ const FEATURE_NAMES = {
   holders_chg_4w_pct: '股東數4週變化', big400_chg_4w: '大戶4週變化', ret_20: '20日漲幅', dist_ma60: '季線乖離',
   range_20: '20日振幅', vol_ratio: '量比', margin_chg_20: '融資20日變化',
 };
+
+// 四維燈號:紅 = 偏多、綠 = 不成立、灰 = 資料不足(台股紅漲綠跌慣例)
+const LIGHTS = [['chip', '籌碼'], ['volume', '量能'], ['ma', '均線'], ['pattern', '型態']];
+const LIGHT_TEXT = { red: '偏多', green: '不成立' };
+function lightDots(l) {
+  if (!l) return '—';
+  return LIGHTS.map(([k, name]) => `<i class="dot ${l[k] ?? 'na'}" title="${name}:${LIGHT_TEXT[l[k]] ?? '資料不足'}"></i>`).join('') + `<span class="red-n">${l.red}</span>`;
+}
 
 // 全域品質旗標(tdcc_warming_up)與缺值標籤不在列上重複顯示,缺值放在展開明細
 function signalTags(signals) {
