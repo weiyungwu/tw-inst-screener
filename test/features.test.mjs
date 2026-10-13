@@ -128,11 +128,17 @@ test('價位與均線:MA、5 日均量、區間高低點由程式算好,下游�
   assert.equal(L.low_20, 144); // D20 第一天 close 145 − 1
   assert.equal(L.high_60, 165);
   assert.equal(L.low_60, 104);
+  // 四維燈號用的「不含當天」窗口:當天的量與最高價不能拿來跟自己比
+  near(L.vol_ma5_prev, (1059 + 1063) / 2, 'vol_ma5_prev'); // i 59..63
+  assert.equal(L.high_19_prev, 164); // H19:i 45..63,最高 close 163 + 1
+  assert.equal(L.high_59_prev, 164); // i 5..63
 
   // 只有 25 天:60 日類為 null,不可用 25 天湊
   const short = priceLevels(series(25));
   assert.equal(short.ma60, null);
   assert.equal(short.high_60, null);
+  assert.equal(short.high_59_prev, null);
+  assert.notEqual(short.high_19_prev, null);
   assert.notEqual(short.ma20, null);
 });
 
@@ -144,4 +150,11 @@ test('融資基數太小(t−20 < 100 張)時融資變化為 null,避免 3 張�
 
   s.margin.set('d05', { margin_balance: 100 }); // 剛好達門檻就照算
   near(computeFeatures(s).margin_chg_20, 297 / 100 - 1, 'margin_chg_20');
+});
+
+test('近 5 日法人(外資+投信)合計:四維籌碼燈第 3 條', () => {
+  const s = series(25);
+  assert.equal(computeFeatures(s).inst_net_5, 5 * 400);
+  s.inst.set('d25', { foreign_net: -5000, trust_net: 0, dealer_net: 0 });
+  assert.equal(computeFeatures(s).inst_net_5, 4 * 400 - 5000);
 });

@@ -3,7 +3,7 @@
 讓 Hermes Agent（或任何支援 function calling 的 agent）查詢本站的「法人同步買超」與「主力吸籌掃描」資料。
 
 - 工具定義採 JSON Schema（OpenAI／Hermes function calling 通用格式）。實際接入方式（tool 檔、MCP、OpenAPI）依你使用的 Hermes 版本調整，**參數與回應格式以本文件為準**。
-- `BASE` = `https://tw-inst-screener.<你的子網域>.workers.dev`
+- `BASE` = `https://tw-stocks.happytoo.cc`
 - 全部端點都是 `GET`，回傳 JSON，允許跨來源（CORS `*`）。
 - 若 Worker 設定了 secret `API_TOKEN`，`/api/*` 要帶 `Authorization: Bearer <token>`；沒設定就公開。
 - 資料每個交易日 18:00、20:00（台北時間）更新。
@@ -65,7 +65,7 @@
 | `market` | 全部 | `TWSE`、`TPEX` |
 | `limit` | 50 | 最多 200 |
 
-回應：`{ scan_date, updated_at, quality, tdcc_weeks, count, stocks: [...] }`。每檔有 `score`、`stage`、`breakdown`、`signals`、`features`、`close`，依分數由高到低排序。
+回應：`{ scan_date, updated_at, quality, tdcc_weeks, count, stocks: [...] }`。每檔有 `score`、`stage`、`breakdown`、`signals`、`features`、`close`、`lights`，依分數由高到低排序。
 
 - `quality` 為 `"tdcc_warming_up"` 時，集保資料不足 4 週，籌碼集中分數僅供參考，回答時要提醒。
 - `breakdown`：`inst` 法人緩買（滿分 30）、`concentration` 籌碼集中（30）、`price` 價格未動（20）、`volume` 量能溫和（10）、`margin` 融資退場（10）。
@@ -74,9 +74,10 @@
 
 `GET /api/stock/{code}`（4 位數普通股代號）。查無此檔（ETF、權證、下市或代號錯誤）時回 `404 { "error": "not_found" }`。
 
-回應包含 `score`、`stage`、`breakdown`、`signals`、`features`、`close`、`levels`、`series`。只要是有資料的普通股都查得到，包含 `NEUTRAL`、`EXCLUDED`。
+回應包含 `score`、`stage`、`breakdown`、`signals`、`features`、`close`、`levels`、`lights`、`series`。只要是有資料的普通股都查得到，包含 `NEUTRAL`、`EXCLUDED`。
 
-- `levels`（程式算好的價位，給分析報告用，不參與評分）：`close`、`prev_close`、`ma5`、`ma10`、`ma20`、`ma60`、`high_20`、`low_20`、`high_60`、`low_60`（元）；`volume`、`vol_ma5`、`vol_ma20`（**股**）。
+- `levels`（程式算好的價位，給分析報告用，不參與評分）：`close`、`prev_close`、`ma5`、`ma10`、`ma20`、`ma60`、`high_20`、`low_20`、`high_60`、`low_60`、`high_19_prev`、`high_59_prev`（元）；`volume`、`vol_ma5`、`vol_ma5_prev`、`vol_ma20`（**股**）。`*_prev` 是不含當天的窗口（前 5 日均量、前 19／59 日最高）。
+- `lights`（四維燈號，程式依 `stock-4d-3d-trade-report` §5 算好）：`chip` 籌碼、`volume` 量能、`ma` 均線、`pattern` 型態，各為 `"red"`（偏多）、`"green"`（不成立）或 `null`（資料不足，不可當成綠燈）；`red` 紅燈數、`valid` 有效燈數（扣除 `null`）。
 - `series`（近 20 個交易日，由舊到新）：`date`、`open`、`high`、`low`、`close`（元）、`volume`（股）、`inst_net`（外資＋投信）、`foreign_net`、`trust_net`、`dealer_net`（**股**）、`margin_balance`（融資餘額，**張**）。
 
 ### features 單位對照（解讀時最容易出錯）
@@ -85,6 +86,7 @@
 |---|---|---|
 | `inst_net_20_pct`、`trust_net_20_pct`、`dealer_net_20_pct` | % 股本（0.8 = 0.8%） | 20 日外資＋投信／投信／自營商淨買超占發行股數 |
 | `inst_buy_days_20` | 天 | 20 日中外資＋投信淨買超為正的天數 |
+| `inst_net_5` | **股** | 近 5 日外資＋投信淨買超合計 |
 | `foreign_ratio_chg_20` | 百分點 | 外資持股比率 20 日變化 |
 | `ret_20`、`dist_ma60`、`range_20`、`margin_chg_20`、`holders_chg_4w_pct` | 小數（0.05 = 5%） | 20 日漲幅、季線乖離、20 日振幅、融資 20 日變化、股東人數 4 週變化 |
 | `vol_ratio` | 倍 | 20 日均量 ÷ 60 日均量 |
@@ -94,7 +96,7 @@
 | `big400_chg_4w`、`retail_chg_4w` | 百分點 | 4 週變化 |
 | `holders` | 人 | 集保股東人數 |
 | `series[].inst_net`、`foreign_net`、`trust_net`、`dealer_net` | **股**（不是張） | 每日法人淨買超 |
-| `series[].volume`、`levels.volume`、`vol_ma5`、`vol_ma20` | **股** | 成交量 |
+| `series[].volume`、`levels.volume`、`vol_ma5`、`vol_ma5_prev`、`vol_ma20` | **股** | 成交量 |
 | `series[].margin_balance` | 張 | 融資餘額 |
 
 `null` 代表資料不足（停牌、新上市、不能融資、集保週數不夠），**不可當成 0**。對應的 `signals` 會有 `missing:<特徵名>`。
@@ -157,7 +159,7 @@
 把工具參數轉成查詢字串即可，陣列用逗號串接：
 
 ```js
-const BASE = 'https://tw-inst-screener.<你的子網域>.workers.dev';
+const BASE = 'https://tw-stocks.happytoo.cc';
 const headers = process.env.TW_API_TOKEN ? { Authorization: `Bearer ${process.env.TW_API_TOKEN}` } : {};
 
 async function call(name, args) {
@@ -193,7 +195,7 @@ async function call(name, args) {
   → `tw_scan({ limit: 10 })`
 - 「法人同步買超和吸籌清單有哪些重疊？逐檔分析。」
   → `tw_cobuy({})` ＋ `tw_scan({ stage: ["ACCUMULATION","WATCH"], limit: 200 })` 取交集，再對每檔 `tw_stock`
-- 要產出完整的分析報告時，建議改用 Hermes skill `specs/台股籌碼資料_Skill_v1.1.md` 抓資料，再交給 `stock-4d-3d-trade-report` 產生報告。
+- 要產出完整的分析報告時，建議改用 Hermes skill `specs/台股籌碼資料_Skill_v1.1.md` 抓資料，再交給 `stock-4d-3d-trade-report`（規格見 `specs/stock-4d-3d-trade-report_v4.md`）產生報告。
 - 「3481 最近籌碼怎麼樣？」
   → `tw_stock({ code: "3481" })`
 
