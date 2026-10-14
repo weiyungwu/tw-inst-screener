@@ -45,9 +45,14 @@
   </main>
 
   <footer>
+    <details open>
+    <summary>說明與資料來源</summary>
     <p>篩選條件:勾選的法人(外資/投信/自營商)<strong>各自</strong>在「累計天數」內淨買超 &gt; 0,且最近「連續買超天數」每天都買超。數值單位為<strong>張</strong>。</p>
     <p class="disc">資料來源:臺灣證券交易所 (TWSE) 與證券櫃檯買賣中心 (TPEX)。本頁僅供參考,<strong>非投資建議</strong>。</p>
+    </details>
   </footer>
+  <script>/* 手機預設收合說明,把空間留給表格 */
+    if (matchMedia('(max-width: 560px)').matches) document.querySelector('footer details').open = false;</script>
 
   <script src="app.js"></script>
 </body>

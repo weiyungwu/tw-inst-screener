@@ -63,10 +63,22 @@ tbody tr:hover { background: #222b37; }
 
 footer { padding: 12px 16px; color: var(--muted); font-size: .78rem; line-height: 1.6; border-top: 1px solid var(--line); flex: 0 0 auto; }
 footer strong { color: var(--text); }
+footer summary { cursor: pointer; color: var(--text); }
+footer details[open] summary { margin-bottom: 4px; }
 .disc { color: #6b7280; }
 
 @media (max-width: 560px) {
   .daily { display: none; }            /* 手機隱藏每日明細欄,改用點列查看 */
+  .sub .days { display: none; }        /* 交易日清單太長,手機只留更新時間 */
+  header { padding: 12px 12px 4px; }
+  .controls { gap: 8px 12px; padding: 8px 12px; }
   th, td { padding: 8px 6px; font-size: .82rem; }
   .count { width: 100%; margin: 4px 0 0; }
+  /* 凍結代號、名稱兩欄,橫滑時仍看得出是哪檔;代號欄定寬,名稱欄才能接在固定位置 */
+  tr:not(.detail) > :first-child { position: sticky; left: 0; width: 4.4em; min-width: 4.4em; max-width: 4.4em; }
+  tr:not(.detail) > :nth-child(2) { position: sticky; left: 4.4em; border-right: 1px solid var(--line); }
+  tbody tr:not(.detail) > :nth-child(-n+2) { z-index: 2; background: var(--bg); }
+  tbody tr:not(.detail):hover > :nth-child(-n+2) { background: #222b37; }
+  thead th:nth-child(-n+2) { z-index: 5; }
+  footer { padding: 8px 12px; max-height: 40vh; overflow-y: auto; }
 }
