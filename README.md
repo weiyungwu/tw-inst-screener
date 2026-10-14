@@ -3,6 +3,9 @@
 自動找出**最近數個交易日,勾選的法人(外資/投信/自營商)「都」買超**的台股(上市 + 上櫃),做成一個
 **公開網頁**,手機/任何電腦用網址即可查看,每個交易日收盤後**自動更新**,你的電腦不用開機。
 
+- 正式網址:<https://tw-stocks.happytoo.cc>(首頁:法人同步買超;`/scan.html`:主力吸籌掃描器)
+- 手機版面自適應:代號、名稱兩欄凍結可橫滑對照,頁尾說明預設收合。
+
 ## 篩選條件
 每一檔股票,網頁上**勾選的法人**(預設外資+自營商,可加勾投信)**各自**都要滿足:
 - 外資含陸資;自營商含自行+避險
@@ -57,15 +60,40 @@ node scripts/verify.mjs         # 列印目前符合條件的股票(自我檢查
 每個交易日收盤後,依四類訊號替上市櫃普通股評分(0~100),找出「法人緩買、大戶集中、價格還沒噴、融資退場」的個股。
 完整規格見 [specs/accumulation-scanner-spec.md](specs/accumulation-scanner-spec.md),各端點實測欄位見 [specs/endpoints.md](specs/endpoints.md)。
 
+### 評分(v1.1,門檻集中在 `lib/score.mjs` 的 `CONFIG`)
+| 群組 | 滿分 | 說明 |
+|---|---|---|
+| 法人 | 30 | 20 日淨買超占股本比、20 日內買超天數 |
+| 籌碼集中 | 30 | 400 張以上大戶連續增加週數、**股東人數 4 週減少超過 2%**、大戶比例 4 週變化 |
+| 價格位置 | 20 | 20 日漲幅 −5%~10%、離季線 ±10% 內、20 日振幅 ≤ 15% |
+| 量能 | 10 | 量比 1.0~1.8 得 10 分、0.8~1.0 得 5 分 |
+| 融資 | 10 | 融資 20 日減少;20 日前餘額 < 100 張時視為資料不足(0 分) |
+
+- **階段**:吸籌 `ACCUMULATION` ≥ 70、觀察 `WATCH` 55~69、其餘 `NEUTRAL`;20 日漲幅 > 25% 或量比 > 2.5 為過熱 `OVERHEATED`;
+  20 日均成交值 < 2,000 萬為 `EXCLUDED`。
+- 集保資料不足(未滿 4 週)時其他群組合計上限 70,實際上最多只到觀察。
+- `scan.json` 帶 `config_version`,調整規則時遞增,回測可區分新舊版本。
+
+### 四維燈號
+掃描頁「四維」欄(可依紅燈數排序)顯示籌碼、量能、均線、型態四顆燈,紅燈偏多、綠燈不成立、灰色為資料不足(不當綠燈)。
+規則見 [specs/stock-4d-3d-trade-report_v4.md](specs/stock-4d-3d-trade-report_v4.md) §5,實作在 `lib/fourd.mjs`:
+- **籌碼**:20 日法人淨買超 ≥ 股本 0.2%、20 日內買超 ≥ 10 天、近 5 日法人合計 > 0
+- **量能**:帶量上攻(量 ≥ 1.5 × 前 5 日均量且收紅),或量比 1.0~1.8 且非爆量長黑
+- **均線**:收盤同時站上 5 / 10 / 20 / 60 日均線
+- **型態**:收盤 > 前 19 日最高,或 ≥ 前 59 日最高
+
+> 「前 N 日」都不含當天,避免當天數值跟自己比。
+
 - **資料**:歷史存在 SQLite(`data/history.sqlite`),放在 R2 的 `db/history.sqlite`。每次 workflow 下載 → 補資料 → 上傳。
   集保股權分散表每週寫入新的一週時,另外備份到 `backups/history-<集保日期>.sqlite`。
 - **需求**:Node ≥ 22.13(使用內建 `node:sqlite`),runtime 零 npm 依賴。
 - **API**(`/api/*` 允許跨來源;設定 Worker secret `API_TOKEN` 後需帶 `Authorization: Bearer <token>`):
-  - `GET /scan.json`:今日 ACCUMULATION / WATCH / OVERHEATED 清單
+  - `GET /scan.json`:今日 ACCUMULATION / WATCH / OVERHEATED 清單(含四維燈號 `lights`)
   - `GET /api/scan?stage=ACCUMULATION,WATCH&min_score=50&market=TPEX&limit=50`
-  - `GET /api/stock/2330`:單檔完整特徵、分數與近 20 日序列(依代號前兩碼讀 `features/23.json`)
+  - `GET /api/stock/2330`:單檔完整特徵、分數、四維燈號、均線與價位(`levels`)及近 20 日序列(依代號前兩碼讀 `features/23.json`)
   - `GET /api/cobuy?days=10&streak=5&insts=foreign,trust&market=TPEX&sort=foreign&limit=50`:法人同步買超,篩選規則與首頁相同(單位張)
-  - Hermes Agent 等 agent 的工具定義與系統提示見 [specs/hermes-tool.md](specs/hermes-tool.md)
+  - Hermes Agent 等 agent 的工具定義與系統提示見 [specs/hermes-tool.md](specs/hermes-tool.md);
+    抓資料用的 skill 見 [specs/台股籌碼資料_Skill_v1.1.md](specs/台股籌碼資料_Skill_v1.1.md)
 
 ```bash
 # 本機(建議先 export TZ=Asia/Taipei)
