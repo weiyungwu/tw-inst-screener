@@ -158,3 +158,83 @@ test('近 5 日法人(外資+投信)合計:四維籌碼燈第 3 條', () => {
   s.inst.set('d25', { foreign_net: -5000, trust_net: 0, dealer_net: 0 });
   assert.equal(computeFeatures(s).inst_net_5, 4 * 400 - 5000);
 });
+
+// ---- 出貨規格 §6 新增特徵 ----
+
+test('inst_sell_days_20:D20 中外資+投信 < 0 的天數,0 不算賣(和 inst_buy_days_20 對稱)', () => {
+  const s = series(25);
+  mkDays(25).slice(5).forEach((d, i) => s.inst.set(d, { foreign_net: i % 4 === 0 ? 0 : i % 2 ? -300 : 300, trust_net: 0, dealer_net: 0 }));
+  // i = 0..19:i%4==0 → 0(5 天)、奇數 → 賣(10 天)、其餘 → 買(5 天)
+  const f = computeFeatures(s);
+  assert.equal(f.inst_sell_days_20, 10);
+  assert.equal(f.inst_buy_days_20, 5);
+});
+
+test('inst_sell_days_20:窗口有效值不足 80% 時為 null(停牌不可當成沒賣)', () => {
+  const s = series(25);
+  for (const d of ['d10', 'd11', 'd12', 'd13', 'd14']) { s.price.delete(d); s.inst.delete(d); }
+  assert.equal(computeFeatures(s).inst_sell_days_20, null);
+});
+
+test('big400_down_weeks:從最新一週往回連續週減的週數,持平就中斷', () => {
+  const w = (big400) => ({ big400, big1000: 0, retail: 0, holders: 1 });
+  assert.equal(tdccFeatures([w(54), w(53), w(52), w(51)]).big400_down_weeks, 3);
+  assert.equal(tdccFeatures([w(50), w(53), w(52), w(51)]).big400_down_weeks, 2, "53 之前是 50,連減在那裡中斷");
+  assert.equal(tdccFeatures([w(53), w(52), w(52), w(51)]).big400_down_weeks, 1, '持平不算減少');
+  assert.equal(tdccFeatures([w(50), w(51)]).big400_down_weeks, 0);
+  assert.equal(tdccFeatures([w(50)]).big400_down_weeks, null, '只有一週無法判斷');
+});
+
+test('drawdown_60:close(t) ÷ D60 最高價 − 1;在高點為 0 附近、不足 60 天為 null', () => {
+  near(computeFeatures(series(65)).drawdown_60, 164 / 165 - 1, 'drawdown_60'); // 上漲序列:高點是 close(t)+1
+  // 前段漲到 200,之後跌回 150:回落 = 150 / 201 − 1
+  const s = series(65, { closeOf: (i) => (i === 30 ? 200 : 150) });
+  near(computeFeatures(s).drawdown_60, 150 / 201 - 1, 'drawdown_60');
+  assert.equal(computeFeatures(series(59)).drawdown_60, null);
+});
+
+test('below_ma20:收盤低於 MA20 為 true;等於不算;MA20 或當日收盤缺值時為 null', () => {
+  assert.equal(computeFeatures(series(25)).below_ma20, false); // 上漲序列 close(t) > MA20
+  assert.equal(computeFeatures(series(25, { closeOf: (i) => 200 - i })).below_ma20, true);
+  assert.equal(computeFeatures(series(25, { closeOf: () => 100 })).below_ma20, false, '等於 MA20 不算跌破');
+  assert.equal(computeFeatures(series(19)).below_ma20, null);
+  const s = series(25);
+  s.price.set('d25', { ...s.price.get('d25'), close: null });
+  assert.equal(computeFeatures(s).below_ma20, null, '當日無收盤不可當成跌破');
+});
+
+// 帶量長黑測試用序列:平盤量 1000、收盤 100;在 at 那天放一根 K 棒
+function dumpSeries(n, at, bar) {
+  const s = series(n, { closeOf: () => 100 });
+  for (const d of s.days) s.price.set(d, { open: 100, high: 101, low: 99, close: 100, volume: 1000, value: 100000 });
+  if (at) s.price.set(at, { high: 101, low: 90, value: 0, ...bar });
+  return s;
+}
+
+test('dump_days_20:量 = 前 5 日均量 × 1.5、收黑、跌 4% → 算一天', () => {
+  assert.equal(computeFeatures(dumpSeries(25, 'd20', { open: 100, close: 96, volume: 1500 })).dump_days_20, 1);
+});
+
+test('dump_days_20:「前 5 日」不含當天(含當天的話基準被自己的大量墊高,1500 < 1100 × 1.5 會漏算)', () => {
+  // 前 5 日均量 1000 → 門檻 1500;若錯把當天算進去:(4×1000 + 1500)/5 = 1100 → 門檻 1650,這根就不會算
+  assert.equal(computeFeatures(dumpSeries(25, 'd20', { open: 100, close: 96, volume: 1500 })).dump_days_20, 1);
+  assert.equal(computeFeatures(dumpSeries(25, 'd20', { open: 100, close: 96, volume: 1499 })).dump_days_20, 0);
+});
+
+test('dump_days_20:收平或收紅不算;跌幅不到 3% 不算', () => {
+  assert.equal(computeFeatures(dumpSeries(25, 'd20', { open: 96, close: 96, volume: 3000 })).dump_days_20, 0, '收平(close = open)');
+  assert.equal(computeFeatures(dumpSeries(25, 'd20', { open: 90, close: 96, volume: 3000 })).dump_days_20, 0, '跳空低開收紅');
+  assert.equal(computeFeatures(dumpSeries(25, 'd20', { open: 100, close: 98, volume: 3000 })).dump_days_20, 0, '只跌 2%');
+});
+
+test('dump_days_20:只看 D20,更早的長黑不算', () => {
+  assert.equal(computeFeatures(dumpSeries(25, 'd05', { open: 100, close: 90, volume: 5000 })).dump_days_20, 0);
+});
+
+test('dump_days_20:可判斷的天數不足 80% 時為 null(每天要有前 5 日均量,20 天資料只有 15 天可判斷)', () => {
+  assert.equal(computeFeatures(dumpSeries(21)).dump_days_20, 0); // D20 = i 1..20,i ≥ 5 才有前 5 日 → 16 天 = 80%
+  assert.equal(computeFeatures(dumpSeries(20)).dump_days_20, null); // 15 天 < 80%
+  const s = dumpSeries(25);
+  for (const d of ['d10', 'd11', 'd12', 'd13', 'd14']) s.price.delete(d); // 停牌 5 天
+  assert.equal(computeFeatures(s).dump_days_20, null);
+});
