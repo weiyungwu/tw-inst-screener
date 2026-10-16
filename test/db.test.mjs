@@ -145,3 +145,10 @@ test('sbl: 超過發行股數只挑出來警告,沒有發行股數的不算', ()
     ['2330', { issued_shares: 1000, foreign_shares: 1, foreign_ratio: 1 }], ['2317', { issued_shares: 1000, foreign_shares: 1, foreign_ratio: 1 }]]));
   assert.deepEqual(sblOverIssued(db, '2026-10-15', sbl({ 2330: [1001, 0, 0], 2317: [1000, 0, 0], 5347: [9e9, 0, 0] })), ['2330']);
 });
+
+test('sbl: parser 附帶的標記(reset_by_halt)不寫進 DB,只寫三個數值欄位', () => {
+  const db = openDb();
+  const m = new Map([['2323', { sbl_balance: 0, sbl_sell: 0, sbl_return: 0, reset_by_halt: true }]]);
+  assert.deepEqual(writeSblDay(db, '2026-10-15', 'TWSE', m, '2026-10-16 18:00:00'), { written: 1, revised: 0, crossMarket: 0 });
+  assert.equal(sblRow(db, '2323').sbl_balance, 0);
+});

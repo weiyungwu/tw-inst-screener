@@ -90,6 +90,24 @@ for (const mk of MARKETS) {
     assert.equal(mk.parse(j, D, MIN).get(String(r[0]).trim()).sbl_balance, 1000);
   });
 
+  test(`${mk.name}: 停止買賣(備註含 !)當天餘額被清空、不記在還券或調整 → 照公布的 0 收下並標記(否則整個市場當天都沒有借券資料)`, () => {
+    const j = fixture(mk.file);
+    const r = mk.rows(j).at(-1);
+    r[8] = '109,000'; r[9] = r[10] = r[11] = r[12] = '0'; r[14] = 'V!';
+    assert.deepEqual(mk.parse(j, D, MIN).get(String(r[0]).trim()), { sbl_balance: 0, sbl_sell: 0, sbl_return: 0, reset_by_halt: true });
+  });
+
+  test(`${mk.name}: 例外只限「含 ! 且餘額為 0」,其餘不符照樣擋下`, () => {
+    assert.throws(bad((j) => { const r = mk.rows(j).at(-1); r[8] = '109,000'; r[9] = r[10] = r[11] = r[12] = '0'; r[14] = 'X'; }), /勾稽不符/, '沒有 !');
+    assert.throws(bad((j) => { const r = mk.rows(j).at(-1); r[8] = '109,000'; r[9] = r[10] = r[11] = '0'; r[12] = '5'; r[14] = 'X!'; }), /勾稽不符/, '餘額不是 0');
+  });
+
+  test(`${mk.name}: 合計列(代號為空)不檢查勾稽(它的差額來自例外列)`, () => {
+    const j = fixture(mk.file);
+    mk.rows(j).push(['', '合計', '0', '0', '0', '0', '0', '0', '100', '0', '0', '0', '0', '0', ' ']);
+    assert.equal(mk.parse(j, D, MIN).size, 3);
+  });
+
   test(`${mk.name}: 回應日期與要求不同時報錯`, () => {
     assert.throws(() => mk.parse(fixture(mk.file), '20261014', MIN), /不符/);
   });
