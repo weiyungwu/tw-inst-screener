@@ -238,3 +238,57 @@ test('dump_days_20:可判斷的天數不足 80% 時為 null(每天要有前 5 �
   for (const d of ['d10', 'd11', 'd12', 'd13', 'd14']) s.price.delete(d); // 停牌 5 天
   assert.equal(computeFeatures(s).dump_days_20, null);
 });
+
+// 借券:發行股數 1,000,000(series 預設);sbl 由 balanceOf(i) 產生
+function withSbl(n, balanceOf) {
+  const s = series(n);
+  s.sbl = new Map(s.days.map((d, i) => [d, { sbl_balance: balanceOf(i) }]));
+  return s;
+}
+
+test('sbl_chg_20_pct、sbl_ratio:分母用發行股數(小基數不放大),單位 %', () => {
+  const f = computeFeatures(withSbl(25, (i) => 10_000 + i * 500)); // t=24:22,000;t−20=4:12,000
+  near(f.sbl_chg_20_pct, 1.0, 'sbl_chg_20_pct'); // (22000 − 12000) / 1,000,000 × 100
+  near(f.sbl_ratio, 2.2, 'sbl_ratio');
+});
+
+test('借券 t 日缺值(當晚還沒公布)整組為 null,不可拿 t−1 頂替(回測會變成偷看晚上才公布的資料)', () => {
+  const s = withSbl(25, () => 10_000);
+  s.sbl.delete('d25');
+  const f = computeFeatures(s);
+  assert.equal(f.sbl_chg_20_pct, null);
+  assert.equal(f.sbl_ratio, null);
+});
+
+test('借券 t−20 缺值時只有 20 日變化為 null,餘額比照算', () => {
+  const s = withSbl(25, () => 10_000);
+  s.sbl.delete('d05');
+  const f = computeFeatures(s);
+  assert.equal(f.sbl_chg_20_pct, null);
+  near(f.sbl_ratio, 1.0, 'sbl_ratio');
+});
+
+test('借券餘額 > 發行股數時整組為 null(增減資時發行股數不同步,算出來的 % 沒有意義)', () => {
+  const f = computeFeatures(withSbl(25, (i) => (i === 24 ? 1_000_001 : 10_000)));
+  assert.equal(f.sbl_chg_20_pct, null);
+  assert.equal(f.sbl_ratio, null);
+  near(computeFeatures(withSbl(25, () => 1_000_000)).sbl_ratio, 100, '剛好等於發行股數照算');
+});
+
+test('沒有借券資料(未傳 sbl)時借券特徵為 null,不可當成 0', () => {
+  const f = computeFeatures(series(25));
+  assert.equal(f.sbl_chg_20_pct, null);
+  assert.equal(f.sbl_ratio, null);
+});
+
+test('short_margin_ratio:融券 ÷ 融資 × 100;融資 < 100 張為 null(分母太小比例會失真)', () => {
+  const s = series(25);
+  s.margin.set('d25', { margin_balance: 200, short_balance: 50 });
+  near(computeFeatures(s).short_margin_ratio, 25, 'short_margin_ratio');
+  s.margin.set('d25', { margin_balance: 100, short_balance: 50 });
+  near(computeFeatures(s).short_margin_ratio, 50, '剛好 100 張照算');
+  s.margin.set('d25', { margin_balance: 99, short_balance: 50 });
+  assert.equal(computeFeatures(s).short_margin_ratio, null);
+  s.margin.set('d25', { margin_balance: 200, short_balance: null });
+  assert.equal(computeFeatures(s).short_margin_ratio, null, '融券缺值不可當 0');
+});

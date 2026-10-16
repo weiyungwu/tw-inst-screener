@@ -88,6 +88,13 @@ function printScan(db) {
   for (const r of rows) if (r.stage !== 'EXCLUDED') for (const s of r.signals) if (s.startsWith('missing:')) miss[s.slice(8)] = (miss[s.slice(8)] ?? 0) + 1;
   console.log(`  缺值特徵(可評分個股): ${Object.entries(miss).map(([k, v]) => `${k} ${v}`).join(' / ') || '無'}`);
 
+  // 出貨規格新增特徵:非 null 檔數(可評分個股),以及借券 20 日增加最多的 10 檔
+  const DIST = ['inst_sell_days_20', 'big400_down_weeks', 'drawdown_60', 'below_ma20', 'dump_days_20', 'sbl_chg_20_pct', 'sbl_ratio', 'short_margin_ratio'];
+  const scored = rows.filter((r) => r.stage !== 'EXCLUDED');
+  console.log(`  出貨特徵有值(可評分 ${scored.length} 檔): ${DIST.map((k) => `${k} ${scored.filter((r) => r.features[k] != null).length}`).join(' / ')}`);
+  const sblTop = scored.filter((r) => r.features.sbl_chg_20_pct != null).sort((a, b) => b.features.sbl_chg_20_pct - a.features.sbl_chg_20_pct).slice(0, 10);
+  console.log(`  借券 20 日增加(%股本)前 ${sblTop.length}: ${sblTop.map((r) => `${r.code}${r.name} ${num(r.features.sbl_chg_20_pct)}(餘額 ${num(r.features.sbl_ratio)}%、券資比 ${num(r.features.short_margin_ratio, 1)})`).join(' / ') || '無'}`);
+
   const top = rows.filter((r) => r.stage === 'ACCUMULATION').slice(0, 20);
   console.log(`\nACCUMULATION 前 ${top.length} 檔(法人/集中/價格/量能/融資):`);
   console.log('代號  名稱        市場  分數  法 集 價 量 融  法人%股本 買超天 20日漲 量比  融資20日 大戶400%');

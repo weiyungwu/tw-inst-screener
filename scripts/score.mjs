@@ -53,8 +53,9 @@ function main() {
   const range = (table, cols) => byCode(db.prepare(`SELECT date, code, ${cols} FROM ${table} WHERE date BETWEEN ? AND ?`).all(from, t));
   const inst = range('inst_daily', 'foreign_net, trust_net, dealer_net');
   const price = range('price_daily', 'open, high, low, close, volume, value');
-  const margin = range('margin_daily', 'margin_balance');
+  const margin = range('margin_daily', 'margin_balance, short_balance');
   const qfii = range('qfii_daily', 'issued_shares, foreign_ratio');
+  const sbl = range('sbl_daily', 'sbl_balance');
 
   // 集保:point-in-time,只用 data_date ≤ t 且 fetched_at ≤ t 當日 23:59:59 的週。
   // 比例由股數計算(Σ股數 ÷ 合計股數),比把各級四捨五入後的 pct 相加精確,週增減判斷才不會被進位誤差干擾。
@@ -83,6 +84,7 @@ function main() {
     const i = inst.get(s.code) ?? empty;
     const features = computeFeatures({
       days, inst: i, price: p, margin: margin.get(s.code) ?? empty, qfii: qfii.get(s.code) ?? empty, tdcc: tdcc.get(s.code) ?? [],
+      sbl: sbl.get(s.code) ?? empty,
     });
     const scored = scoreStock(features);
     const m = margin.get(s.code) ?? empty;
