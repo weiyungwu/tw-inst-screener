@@ -73,6 +73,18 @@ CREATE TABLE IF NOT EXISTS scan_daily (
   PRIMARY KEY (date, code)
 );
 
+-- 借券賣出（出貨掃描器）；fetched_at 只在第一次寫入或數值被官方修正時更新
+CREATE TABLE IF NOT EXISTS sbl_daily (
+  date         TEXT NOT NULL,
+  code         TEXT NOT NULL,
+  market       TEXT NOT NULL CHECK (market IN ('TWSE','TPEX')),  -- 當日資料來自哪個市場
+  sbl_balance  INTEGER,                -- 借券賣出當日餘額（股）
+  sbl_sell     INTEGER,                -- 當日借券賣出（股）
+  sbl_return   INTEGER,                -- 當日還券（股）
+  fetched_at   TEXT NOT NULL,          -- 實際抓到的時間（台北），回測時用來對齊可取得時點
+  PRIMARY KEY (date, code)
+);
+
 CREATE TABLE IF NOT EXISTS ingest_log (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,
   run_at    TEXT NOT NULL DEFAULT (datetime('now')),
@@ -88,3 +100,4 @@ CREATE INDEX IF NOT EXISTS idx_price_code  ON price_daily(code, date);
 CREATE INDEX IF NOT EXISTS idx_margin_code ON margin_daily(code, date);
 CREATE INDEX IF NOT EXISTS idx_qfii_code   ON qfii_daily(code, date);
 CREATE INDEX IF NOT EXISTS idx_tdcc_code   ON tdcc_weekly(code, data_date);
+CREATE INDEX IF NOT EXISTS idx_sbl_code    ON sbl_daily(code, date);

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { openDb, writeInstDay, hasTwseFp, completeDates } from '../lib/db.mjs';
+import { openDb, writeInstDay, hasTwseFp, completeDates, writeSblDay } from '../lib/db.mjs';
 
 const day = (twse, tpex, fp = 1) => ({ twse: new Map(Object.entries(twse)), tpex: new Map(Object.entries(tpex)), fp });
 const v = (name, foreign, trust = 0, dealer = 0) => ({ name, foreign, trust, dealer });
@@ -59,4 +59,53 @@ test('price/margin/qfii 寫入冪等,且依市場判斷是否已有資料(上市
   const halt = new Map([['2330', { open: null, high: null, low: null, close: null, volume: 0, value: 0 }]]);
   writeDailyRows(db, 'price_daily', cols, '2026-10-06', halt);
   assert.equal(db.prepare("SELECT close FROM price_daily WHERE code = '2330'").get().close, null);
+});
+
+const sbl = (entries) => new Map(Object.entries(entries).map(([code, [b, s, r]]) => [code, { sbl_balance: b, sbl_sell: s, sbl_return: r }]));
+const sblRow = (db, code) => db.prepare('SELECT * FROM sbl_daily WHERE date = ? AND code = ?').get('2026-10-15', code);
+const revisedLogs = (db) => db.prepare("SELECT source, rows FROM ingest_log WHERE message = 'sbl revised'").all().map((r) => ({ ...r }));
+
+test('sbl: 相同數值重抓不動 fetched_at(回測要知道資料「最早」何時可取得,22:45 重跑不可把時間往後推)', () => {
+  const db = openDb();
+  assert.deepEqual(writeSblDay(db, '2026-10-15', 'TWSE', sbl({ 2330: [12797514, 785000, 39000] }), '2026-10-15 20:35:00'), { written: 1, revised: 0 });
+  assert.deepEqual(writeSblDay(db, '2026-10-15', 'TWSE', sbl({ 2330: [12797514, 785000, 39000] }), '2026-10-15 22:45:00'), { written: 0, revised: 0 });
+  assert.equal(sblRow(db, '2330').fetched_at, '2026-10-15 20:35:00');
+  assert.deepEqual(revisedLogs(db), []);
+});
+
+test('sbl: 數值被官方修正時更新數值與 fetched_at,並記 sbl revised(否則看不出 20:30 與 22:30 版本不同)', () => {
+  const db = openDb();
+  writeSblDay(db, '2026-10-15', 'TWSE', sbl({ 2330: [100, 10, 0], 2317: [200, 0, 0] }), '2026-10-15 20:35:00');
+  const r = writeSblDay(db, '2026-10-15', 'TWSE', sbl({ 2330: [150, 60, 0], 2317: [200, 0, 0] }), '2026-10-15 22:45:00');
+  assert.deepEqual(r, { written: 1, revised: 1 });
+  assert.equal(sblRow(db, '2330').sbl_balance, 150);
+  assert.equal(sblRow(db, '2330').fetched_at, '2026-10-15 22:45:00');
+  assert.equal(sblRow(db, '2317').fetched_at, '2026-10-15 20:35:00');
+  assert.deepEqual(revisedLogs(db), [{ source: 'twse-sbl', rows: 1 }]);
+});
+
+test('sbl: 新增的代號不算修正(22:30 才納入的轉上市股是第一次寫入,不是官方改數字)', () => {
+  const db = openDb();
+  writeSblDay(db, '2026-10-15', 'TWSE', sbl({ 2330: [100, 0, 0] }), '2026-10-15 20:35:00');
+  assert.deepEqual(writeSblDay(db, '2026-10-15', 'TWSE', sbl({ 2330: [100, 0, 0], 6488: [5, 5, 0] }), '2026-10-15 22:45:00'), { written: 1, revised: 0 });
+  assert.equal(sblRow(db, '6488').fetched_at, '2026-10-15 22:45:00');
+  assert.deepEqual(revisedLogs(db), []);
+});
+
+test('sbl: 同一檔改由另一市場回報也算修正(轉上市時 market 是依當日資料判斷的歷史市場)', () => {
+  const db = openDb();
+  writeSblDay(db, '2026-10-15', 'TPEX', sbl({ 6488: [5, 5, 0] }), '2026-10-15 20:35:00');
+  assert.deepEqual(writeSblDay(db, '2026-10-15', 'TWSE', sbl({ 6488: [5, 5, 0] }), '2026-10-15 22:45:00'), { written: 1, revised: 1 });
+  assert.equal(sblRow(db, '6488').market, 'TWSE');
+});
+
+test('sbl: 寫入中途失敗整批 rollback,也不留下 revised 紀錄', () => {
+  const db = openDb();
+  writeSblDay(db, '2026-10-15', 'TWSE', sbl({ 2330: [100, 0, 0] }), '2026-10-15 20:35:00');
+  const bad = sbl({ 2330: [999, 0, 0] });
+  bad.set('2317', { sbl_balance: 1, sbl_sell: 0, sbl_return: 0 });
+  assert.throws(() => writeSblDay(db, '2026-10-15', 'XXX', bad, '2026-10-15 22:45:00'));
+  assert.equal(sblRow(db, '2330').sbl_balance, 100);
+  assert.equal(sblRow(db, '2317'), undefined);
+  assert.deepEqual(revisedLogs(db), []);
 });
