@@ -1,10 +1,10 @@
 # SPEC：主力出貨掃描器（Distribution Scanner）v0 草案
 
 > 專案：`tw-inst-screener`（weiyungwu/tw-inst-screener）
-> 版本：v0.3 草案 · 2026-10-16（**尚未實作，門檻待校準**）
+> 版本：v0.4 草案 · 2026-10-16（**尚未實作，門檻待校準**）
 > - v0.2：借券資料晚公布的處理方式定案，新增台北 22:45 排程（§5.1、§13 第 1 項）。
 > - v0.3：依外部 review 修訂。新增：資料覆蓋率與 `PROVISIONAL` 階段（§7.2）、借券資料的實際取得時間（§4、§6）、`run_id` 與部分失敗的處理（§5.2、§8）、P3 的前瞻驗證與特徵增量測試（§11）、模組責任（§2.3）。修正 GitHub Actions 併發行為的錯誤描述（§5.1）。不採納的建議和理由記在 §2.4。
-> - v0.4：依第二輪 review 補上四條規則：歷史股票池（§7.6）、前瞻報酬的缺值處理（§7.7）、併發驗收（§5.1、§11 P4）、建置一致性提示（§5.2、§8.3）。
+> - v0.4：依第二輪 review 補上四條規則：歷史股票池（§7.6）、前瞻報酬的缺值處理（§7.7）、併發驗收（§5.1、§11 P4）、建置一致性提示（§5.2、§8.3）。前端改為另開 `dist.html`（§8.3、§13 第 5 項）。
 >
 > 前置文件：[accumulation-scanner-spec.md](accumulation-scanner-spec.md)（吸籌掃描器）、[endpoints.md](endpoints.md)
 > 本文件是實作規格。請**依 Phase 順序**實作，每個 Phase 完成後停下來回報，等使用者確認再繼續。
@@ -396,8 +396,8 @@ CREATE TABLE IF NOT EXISTS dist_daily (
   - `dist.json` 是清單頁和 `/api/dist` 的來源，`dist_daily` 是回測的來源，Worker 不讀 `dist_daily`。
 
 ### 8.3 前端
-- `scan.html` 上方加「吸籌 / 出貨風險」切換，預設吸籌；出貨模式讀 `/dist.json`。
-- 出貨模式用和吸籌**不同的強調色**，表頭寫明「疑似出貨風險」，避免使用者把清單看成買進名單。
+- 另開一頁 `docs/dist.html`（邏輯放 `docs/dist.js`），讀 `/dist.json`；版本提示需要比對時另外讀 `/scan.json`。`scan.html` 不改，只在 `index.html`、`scan.html` 的導覽列加上連到 `dist.html` 的連結。
+- 出貨頁用和吸籌**不同的強調色**，表頭寫明「疑似出貨風險」，避免使用者把清單看成買進名單。
 - `PROVISIONAL` 和 `COLLAPSED` 各自分組顯示，不和正式階段混在一起，說明文字照 §7.2。
 - 顯示覆蓋率。
 - **版本與延遲提示**。頁首一律顯示資料日期（`scan_date`）和更新時間（`updated_at`），並依序檢查下面四種狀況，符合的都要顯示：
@@ -486,7 +486,7 @@ CREATE TABLE IF NOT EXISTS dist_daily (
   - 如果前瞻結果和比較組沒有差異，要照實回報，由使用者決定要調整計分結構還是暫停上線。
 
 ### P4　部署整合
-- Worker 新增路由、workflow 上傳 `dist.json`（§5.2 的 `continue-on-error`）、`scan.html` 加切換、README 新增一節（用語照 §1.2）。
+- Worker 新增路由、workflow 上傳 `dist.json`（§5.2 的 `continue-on-error`）、新增 `dist.html` 並在 `index.html`、`scan.html` 加連結、README 新增一節（用語照 §1.2）。
 - 排程（§5.1）：
   - `wrangler.jsonc` 的 `triggers.crons` 加上 `"45 14 * * MON-FRI"`，並更新註解為「台北 18:00 / 20:00 / 22:45」。
   - `update.yml` 的 `schedule` 加上 `'45 14 * * 1-5'`。
@@ -537,7 +537,7 @@ CREATE TABLE IF NOT EXISTS dist_daily (
 | 2 | backfill 天數 | P1 | 60 個交易日（和現有歷史對齊） |
 | 3 | 評分門檻、`coverage` 門檻 0.85 | P3 校準後 | 照 §7 起始值 |
 | 4 | 前瞻驗證沒有顯著差異時的處置 | P3 | 由使用者決定：調整計分結構，或暫停上線 |
-| 5 | 前端切換方式 | P4 | 同頁切換（預設），或另開 `/dist.html` |
+| 5 | ~~前端切換方式~~ | — | **已定案（2026-10-16）**：另開 `dist.html`，見 §8.3 |
 | 6 | 首頁「法人同步賣超」 | 任何時候 | 另開小 PR，不在本規格範圍內 |
 
 ---
