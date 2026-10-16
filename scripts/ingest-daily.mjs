@@ -3,7 +3,8 @@
 //
 // 執行:  TZ=Asia/Taipei node scripts/ingest-daily.mjs
 // 需求:  Node ≥ 22.13(node:sqlite);DB 路徑可用 DB_PATH 覆寫,預設 data/history.sqlite
-// 來源:  法人(上市 T86 + 上櫃 dailyTrade)決定交易日;之後補 price/margin/qfii 各市場缺漏。
+// 來源:  法人(上市 T86 + 上櫃 dailyTrade)決定交易日;之後補 price/margin/qfii/sbl 各市場缺漏。
+//        借券在當天 22:30 之後抓到的版本才算完整,之前抓到的(20:30 版)下一次會重抓。
 //        已完整的日期與來源不再發請求,所以 18:00 失敗的部分 20:00 會補上。
 // ===========================================================================
 import { fileURLToPath } from 'node:url';
@@ -37,7 +38,7 @@ async function main() {
   }
 
   const count = (t) => db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n;
-  const totals = ['trading_days', 'stocks', 'inst_daily', 'price_daily', 'margin_daily', 'qfii_daily'].map((t) => `${t} ${count(t)}`).join(' / ');
+  const totals = ['trading_days', 'stocks', 'inst_daily', 'price_daily', 'margin_daily', 'qfii_daily', 'sbl_daily'].map((t) => `${t} ${count(t)}`).join(' / ');
   db.close();
   process.stderr.write(`\n摘要:\n${summary.map((s) => `  ${s}`).join('\n') || '  (沒有需要處理的日期)'}\n`);
   process.stderr.write(`DB ${DB_PATH}: ${totals}\n`);

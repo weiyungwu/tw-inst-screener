@@ -18,7 +18,7 @@ const { values: args } = parseArgs({ options: { stats: { type: 'boolean', defaul
 function printStats(db) {
   const tables = [
     ['trading_days', 'date'], ['inst_daily', 'date'], ['price_daily', 'date'],
-    ['margin_daily', 'date'], ['qfii_daily', 'date'], ['tdcc_weekly', 'data_date'], ['scan_daily', 'date'],
+    ['margin_daily', 'date'], ['qfii_daily', 'date'], ['sbl_daily', 'date'], ['tdcc_weekly', 'data_date'], ['scan_daily', 'date'],
   ];
   console.log('表              日期數    筆數  範圍');
   for (const [t, col] of tables) {
@@ -40,6 +40,18 @@ function printStats(db) {
     ORDER BY d.date`).all();
   console.log(`\n交易日缺漏(來源/市場): ${gaps.length ? '' : '無'}`);
   for (const g of gaps) console.log(`  ${g.date} ${g.tbl} ${g.market}`);
+
+  // 借券:只看第一筆借券資料之後的交易日(更早的日期沒有回補,不算缺漏);市場用 sbl_daily.market
+  const sblGaps = db.prepare(`
+    SELECT d.date, s.market FROM trading_days d
+    CROSS JOIN (SELECT 'TWSE' AS market UNION ALL SELECT 'TPEX') s
+    WHERE d.twse_ok = 1 AND d.tpex_ok = 1 AND d.date >= (SELECT MIN(date) FROM sbl_daily)
+      AND NOT EXISTS (SELECT 1 FROM sbl_daily b WHERE b.date = d.date AND b.market = s.market)
+    ORDER BY d.date, s.market`).all();
+  const sblDays = db.prepare('SELECT market, COUNT(DISTINCT date) AS days, MIN(date) AS lo, MAX(date) AS hi FROM sbl_daily GROUP BY market').all();
+  console.log(`\n借券 sbl_daily: ${sblDays.map((r) => `${r.market} ${r.days} 日(${r.lo} ~ ${r.hi})`).join(' / ') || '無資料'}`);
+  console.log(`借券缺漏(交易日/市場): ${sblGaps.length ? '' : '無'}`);
+  for (const g of sblGaps) console.log(`  ${g.date} ${g.market}`);
 
   const errors = db.prepare(`SELECT run_at, source, date, message FROM ingest_log WHERE status = 'error' ORDER BY id DESC LIMIT 10`).all();
   console.log(`\n最近 ingest 錯誤: ${errors.length ? '' : '無'}`);
