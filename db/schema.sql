@@ -85,6 +85,20 @@ CREATE TABLE IF NOT EXISTS sbl_daily (
   PRIMARY KEY (date, code)
 );
 
+-- 出貨掃描結果（股票池 universe(t) 內全部個股，供回測；特徵已存在 scan_daily.features，不重複存）
+CREATE TABLE IF NOT EXISTS dist_daily (
+  date           TEXT NOT NULL,
+  code           TEXT NOT NULL,
+  score          INTEGER NOT NULL,       -- 原始分數，不依覆蓋率放大
+  coverage       REAL NOT NULL,          -- 可計算的配分 ÷ 100
+  stage          TEXT NOT NULL,
+  breakdown      TEXT NOT NULL,          -- JSON
+  signals        TEXT NOT NULL,          -- JSON array
+  config_version TEXT NOT NULL,
+  run_id         TEXT,                   -- GitHub Actions 的 GITHUB_RUN_ID；本機執行為 'local'
+  PRIMARY KEY (date, code)
+);
+
 CREATE TABLE IF NOT EXISTS ingest_log (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,
   run_at    TEXT NOT NULL DEFAULT (datetime('now')),

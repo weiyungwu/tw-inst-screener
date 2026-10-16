@@ -28,7 +28,7 @@ test('配分合計 100,全部拿滿 = 100 分、coverage 1.0', () => {
   assert.equal(r.score, 100);
   assert.equal(r.coverage, 1);
   assert.equal(r.stage, 'DISTRIBUTION');
-  assert.deepEqual(r.breakdown, { inst: 30, spread: 25, weak: 20, volume: 10, credit: 15 });
+  assert.deepEqual(r.breakdown, { inst: 30, dispersion: 25, price: 20, volume: 10, credit: 15 });
 });
 
 test('法人調節:淨賣超 % 股本分級(≤ 門檻)、賣超天數分級(≥ 門檻)', () => {
@@ -37,19 +37,19 @@ test('法人調節:淨賣超 % 股本分級(≤ 門檻)、賣超天數分級(≥
 });
 
 test('籌碼分散:大戶連減週數、股東人數增加 > 2%(等於不算)、大戶 4 週 ≤ −0.5', () => {
-  for (const [v, pts] of [[3, 12], [2, 6], [1, 0]]) assert.equal(part({ big400_down_weeks: v }, 'spread'), pts, `weeks ${v}`);
-  assert.equal(part({ holders_chg_4w_pct: 0.02 }, 'spread'), 0);
-  assert.equal(part({ holders_chg_4w_pct: 0.0201 }, 'spread'), 8);
-  assert.equal(part({ big400_chg_4w: -0.5 }, 'spread'), 5);
-  assert.equal(part({ big400_chg_4w: -0.49 }, 'spread'), 0);
+  for (const [v, pts] of [[3, 12], [2, 6], [1, 0]]) assert.equal(part({ big400_down_weeks: v }, 'dispersion'), pts, `weeks ${v}`);
+  assert.equal(part({ holders_chg_4w_pct: 0.02 }, 'dispersion'), 0);
+  assert.equal(part({ holders_chg_4w_pct: 0.0201 }, 'dispersion'), 8);
+  assert.equal(part({ big400_chg_4w: -0.5 }, 'dispersion'), 5);
+  assert.equal(part({ big400_chg_4w: -0.49 }, 'dispersion'), 0);
 });
 
 test('高檔轉弱:從高點回落 3%~15% 才給分(還在高點或已經崩都不算)、仍在季線上 5% 以上、跌破 MA20', () => {
-  for (const [v, pts] of [[-0.15, 10], [-0.03, 10], [-0.151, 0], [-0.029, 0], [0, 0]]) assert.equal(part({ drawdown_60: v }, 'weak'), pts, `drawdown ${v}`);
-  assert.equal(part({ dist_ma60: 0.05 }, 'weak'), 5);
-  assert.equal(part({ dist_ma60: 0.049 }, 'weak'), 0);
-  assert.equal(part({ below_ma20: true }, 'weak'), 5);
-  assert.equal(part({ below_ma20: null }, 'weak'), 0);
+  for (const [v, pts] of [[-0.15, 10], [-0.03, 10], [-0.151, 0], [-0.029, 0], [0, 0]]) assert.equal(part({ drawdown_60: v }, 'price'), pts, `drawdown ${v}`);
+  assert.equal(part({ dist_ma60: 0.05 }, 'price'), 5);
+  assert.equal(part({ dist_ma60: 0.049 }, 'price'), 0);
+  assert.equal(part({ below_ma20: true }, 'price'), 5);
+  assert.equal(part({ below_ma20: null }, 'price'), 0);
 });
 
 test('量能異常與信用借券的分級邊界', () => {

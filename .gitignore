@@ -10,6 +10,7 @@ scripts/backtest_result.json
 # 資料改存 R2,由 GitHub Actions 上傳(本機 build 仍會產生)
 docs/data.json
 docs/scan.json
+docs/dist.json
 
 # 歷史資料庫與本機資料(存 R2,不 commit)
 data/
