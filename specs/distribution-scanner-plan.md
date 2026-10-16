@@ -1,7 +1,7 @@
 # 實作計畫：主力出貨掃描器（Distribution Scanner）
 
 > 依據：[distribution-scanner-spec.md](distribution-scanner-spec.md) v0.4（含 2026-10-16 定案：另開 `dist.html`） · 分支 `feat/distribution-scanner` · PR base `weiyungwu:master`
-> 測試指令：`node --test test/`（零 npm 依賴）
+> 測試指令：`node --test`（零 npm 依賴；Node 22 不接受目錄參數 `test/`）
 
 ## 概要
 把規格的 P0～P4 拆成 19 個 S/M 任務。每個任務都讓系統維持在可運作的狀態，每個 Phase 結束時停下來回報（規格 §11）。
