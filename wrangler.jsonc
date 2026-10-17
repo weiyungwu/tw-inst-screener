@@ -6,7 +6,7 @@
   "r2_buckets": [{ "binding": "DATA", "bucket_name": "tw-stocks-data" }],
   // 分支預覽版(Worker Previews)也讀同一個 bucket:Worker 只讀 R2、從不寫入,預覽版不會改到正式資料
   "previews": { "r2_buckets": [{ "binding": "DATA", "bucket_name": "tw-stocks-data" }] },
-  // UTC;準時觸發 GitHub Actions(台北 18:00 / 20:00)。星期用英文縮寫,Cloudflare 的 1 是週日。
-  "triggers": { "crons": ["0 10 * * MON-FRI", "0 12 * * MON-FRI"] },
+  // UTC;準時觸發 GitHub Actions(台北 18:00 / 20:00 / 22:45,22:45 補當天借券)。星期用英文縮寫,Cloudflare 的 1 是週日。
+  "triggers": { "crons": ["0 10 * * MON-FRI", "0 12 * * MON-FRI", "45 14 * * MON-FRI"] },
   "observability": { "enabled": true }
 }
