@@ -93,7 +93,8 @@ node scripts/verify.mjs         # 列印目前符合條件的股票(自我檢查
   - `GET /api/stock/2330`:單檔完整特徵、分數、四維燈號、均線與價位(`levels`)及近 20 日序列(依代號前兩碼讀 `features/23.json`)
   - `GET /api/cobuy?days=10&streak=5&insts=foreign,trust&market=TPEX&sort=foreign&limit=50`:法人同步買超,篩選規則與首頁相同(單位張)
   - Hermes Agent 等 agent 的工具定義與系統提示見 [specs/hermes-tool.md](specs/hermes-tool.md);
-    抓資料用的 skill 見 [specs/台股籌碼資料_Skill_v1.1.md](specs/台股籌碼資料_Skill_v1.1.md)
+    抓資料用的 skill 見 [specs/台股籌碼資料_Skill_v1.2.md](specs/台股籌碼資料_Skill_v1.2.md);
+    報告 skill:偏多交易劇本 [specs/stock-4d-3d-trade-report_v4.md](specs/stock-4d-3d-trade-report_v4.md)、疑似出貨風險與持股防守 [specs/stock-dist-risk-report_v1.md](specs/stock-dist-risk-report_v1.md)
 
 ```bash
 # 本機(建議先 export TZ=Asia/Taipei)
