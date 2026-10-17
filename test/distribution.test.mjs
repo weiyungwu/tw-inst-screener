@@ -125,7 +125,8 @@ test('訊號標籤與呼叫端傳入的市場狀態', () => {
     assert.ok(r.signals.includes(s), s);
   }
   assert.deepEqual(score({}).signals, [], '基準個股沒有任何訊號');
-  assert.equal(CONFIG.version, 'd-v0.1');
+  assert.equal(CONFIG.version, 'd-v1.0');
+  assert.equal(CONFIG.experimental, true, '樣本不足以下定論,規格 §9 第 7 點要求標示實驗性');
 });
 
 test('歷史股票池:t 之後才上市、t 之前已下市都不在 universe(t);t 之後才轉上市的 market(t) 是上櫃', () => {

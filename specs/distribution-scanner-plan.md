@@ -165,6 +165,8 @@ T2 公布時間實測（獨立，crontab 自動執行）
 **依賴**：T11、T12 · **檔案**：`scripts/calibrate-dist.mjs`、`specs/distribution-calibration.md` · **規模**：M
 
 ### Checkpoint P3（使用者決策點）
+> 2026-10-17 定案：門檻維持 d-v0.1 不調整，定為 `d-v1.0`、`experimental: true`（`dist.json` 帶出）。T15、T16 的前端與 README 要註明：訊號以 20 日為參考期間、5 日沒有分辨力、名單個股期間內的上漲幅度和其他股票相同（最大不利變動無差異）。籌碼分散組待集保累積 20 週以上再重新校準。
+
 - [ ] 使用者看過報告，決定門檻 → `config_version` 才改成 `d-v1.0`（標示為「實驗性」）
 - [ ] 沒有差異時，由使用者決定要調整計分結構，還是暫停上線（§13 第 4 項）
 

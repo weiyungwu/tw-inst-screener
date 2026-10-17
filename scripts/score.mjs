@@ -220,6 +220,7 @@ function main() {
       sbl_latest: dist.sblDays.latest,
       sbl_status: dist.sblStatus,
       config_version: DIST_CONFIG.version,
+      experimental: DIST_CONFIG.experimental,
       quality: pending ? 'sbl_pending' : dist.sblWarmingUp ? 'sbl_warming_up' : meta.quality,
       counts: Object.fromEntries(DIST_PUBLISHED.map((k) => [k, distCounts[k]])),
       stocks: distStocks,
