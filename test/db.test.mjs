@@ -152,3 +152,25 @@ test('sbl: parser 附帶的標記(reset_by_halt)不寫進 DB,只寫三個數值�
   assert.deepEqual(writeSblDay(db, '2026-10-15', 'TWSE', m, '2026-10-16 18:00:00'), { written: 1, revised: 0, crossMarket: 0 });
   assert.equal(sblRow(db, '2323').sbl_balance, 0);
 });
+
+test('sbl: 22:30 版和 20:30 版數值相同時,22:30 之後成功抓過一次就算最終版(否則 14 天內每次執行都重抓)', () => {
+  const db = openDb();
+  const m = sbl({ 2330: [100, 0, 0] });
+  writeSblDay(db, '2026-10-15', 'TWSE', m, '2026-10-15 20:45:00');
+  const ok = (runAtUtc) => db.prepare("INSERT INTO ingest_log (run_at, source, date, status, rows) VALUES (?, 'twse-sbl', '2026-10-15', 'ok', 1)").run(runAtUtc);
+  ok('2026-10-15 12:45:00'); // 台北 20:45
+  assert.equal(sblFinal(db, '2026-10-15', 'TWSE'), false, '20:45 那次本身不算');
+  writeSblDay(db, '2026-10-15', 'TWSE', m, '2026-10-15 22:47:00'); // 數值相同 → fetched_at 不動
+  assert.equal(sblRow(db, '2330').fetched_at, '2026-10-15 20:45:00');
+  ok('2026-10-15 14:47:00'); // 台北 22:47
+  assert.equal(sblFinal(db, '2026-10-15', 'TWSE'), true);
+  assert.equal(sblFinal(db, '2026-10-15', 'TPEX'), false, '市場分開判斷');
+});
+
+test('sbl: 22:30 之前的成功紀錄、或 error 紀錄,都不能讓該日變成最終版', () => {
+  const db = openDb();
+  writeSblDay(db, '2026-10-15', 'TWSE', sbl({ 2330: [100, 0, 0] }), '2026-10-15 20:45:00');
+  db.prepare("INSERT INTO ingest_log (run_at, source, date, status) VALUES ('2026-10-15 14:29:59', 'twse-sbl', '2026-10-15', 'ok')").run();
+  db.prepare("INSERT INTO ingest_log (run_at, source, date, status) VALUES ('2026-10-15 14:50:00', 'twse-sbl', '2026-10-15', 'error')").run();
+  assert.equal(sblFinal(db, '2026-10-15', 'TWSE'), false);
+});

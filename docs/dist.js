@@ -35,7 +35,7 @@ const cls = (v) => (v == null ? '' : v > 0 ? 'pos' : v < 0 ? 'neg' : '');
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 const COLS = [
-  { key: 'code', label: '代號', get: (s) => s.code, html: (s) => `<td class="code"><a class="code" href="https://tw.stock.yahoo.com/quote/${s.code}" target="_blank" rel="noopener">${s.code}</a></td>` },
+  { key: 'code', label: '代號', get: (s) => s.code, html: (s) => `<td class="code"><a class="code" href="https://tw.stock.yahoo.com/quote/${esc(s.code)}" target="_blank" rel="noopener">${esc(s.code)}</a></td>` },
   { key: 'name', label: '名稱', get: (s) => s.name, html: (s) => `<td>${esc(s.name)}</td>` },
   { key: 'market', label: '市場', get: (s) => s.market, html: (s) => `<td><span class="tag">${MARKET[s.market] ?? '—'}</span></td>` },
   { key: 'score', label: '分數', num: true, get: (s) => s.score, html: (s) => `<td class="score">${s.score}</td>` },
@@ -200,7 +200,7 @@ function render() {
 
   const body = document.getElementById('body');
   body.innerHTML = rows.map((s) =>
-    `<tr data-code="${s.code}">${COLS.map((c) => c.html(s, s.features)).join('')}</tr>${state.open.has(s.code) ? detailRow(s) : ''}`).join('');
+    `<tr data-code="${esc(s.code)}">${COLS.map((c) => c.html(s, s.features)).join('')}</tr>${state.open.has(s.code) ? detailRow(s) : ''}`).join('');
   body.querySelectorAll('tr[data-code]').forEach((tr) => {
     tr.onclick = (e) => {
       if (e.target.closest('a')) return;

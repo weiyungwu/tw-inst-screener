@@ -207,7 +207,7 @@ function main() {
   const published = results
     .filter((r) => PUBLISHED.includes(r.stage))
     .sort((a, b) => PUBLISHED.indexOf(a.stage) - PUBLISHED.indexOf(b.stage) || b.score - a.score || a.code.localeCompare(b.code))
-    .map(({ series, levels, ...r }) => r); // scan.json 只放清單需要的欄位;明細在 features 分片
+    .map(({ series, levels, distribution, ...r }) => r); // scan.json 只放清單需要的欄位;明細(含出貨評分)在 features 分片
   mkdirSync(dirname(SCAN_PATH), { recursive: true });
   writeFileSync(SCAN_PATH, JSON.stringify({ ...meta, counts, stocks: published, note: '僅供研究參考，非投資建議。' }));
 
