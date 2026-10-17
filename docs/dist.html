@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>疑似出貨風險</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* 出貨風險頁專用;共用樣式在 style.css 不修改。強調色改成橘色,和吸籌(藍)區分,避免把清單看成買進名單 */
+    :root { --accent: #ff9f43; }
+    .nav { float: right; margin-left: 14px; font-size: .85rem; color: var(--accent); text-decoration: none; }
+    .nav:hover { text-decoration: underline; }
+    h1 .exp { white-space: nowrap; font-size: .7rem; vertical-align: middle; margin-left: 8px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--accent); color: var(--accent); font-weight: 400; }
+    .warn { margin: 8px 16px 0; padding: 8px 12px; border-radius: 6px; background: #3a3214; border: 1px solid #6b5a1a; color: #f3d36b; font-size: .82rem; }
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .tabs button {
+      background: var(--bg); color: var(--muted); border: 1px solid var(--line);
+      border-radius: 6px; padding: 5px 12px; font-size: .88rem; cursor: pointer;
+    }
+    .tabs button.on { color: var(--text); border-color: var(--accent); background: #3a2a1a; }
+    .tabs .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+    .tabs button.aside { border-style: dashed; }
+    .note { margin: 8px 16px 0; color: var(--muted); font-size: .8rem; }
+    .score { font-weight: 700; }
+    .cov.low { color: #f3d36b; }
+    .sig { display: inline-block; font-size: .72rem; padding: 1px 6px; margin: 1px 2px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
+    .sig.hot { color: var(--accent); border-color: #6b4a1a; }
+    td.sigs { text-align: left; white-space: normal; min-width: 180px; }
+    tr.detail { cursor: default; background: var(--panel); }
+    tr.detail:hover { background: var(--panel); }
+    tr.detail td { text-align: left; white-space: normal; }
+    .bars { display: grid; grid-template-columns: 5.5em 1fr 4em; gap: 4px 10px; align-items: center; max-width: 460px; font-size: .8rem; }
+    .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+    .bar > i { display: block; height: 100%; background: var(--accent); }
+    .muted { color: var(--muted); font-size: .78rem; margin-top: 8px; }
+    .muted.warn-text { color: #f3d36b; }
+    @media (max-width: 560px) {
+      td.sigs { white-space: nowrap; min-width: 0; }
+      .tabs button { padding: 4px 9px; }
+      .tabs .sep { display: none; }
+      h1 { clear: both; padding-top: 4px; } /* 兩個導覽連結放第一行,標題換到下一行 */
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="nav" href="scan.html">吸籌掃描 →</a>
+    <a class="nav" href="index.html">← 法人同步買超</a>
+    <h1>疑似出貨風險<span class="exp" id="exp" hidden>實驗性</span></h1>
+    <p class="sub" id="meta">資料載入中…</p>
+  </header>
+  <div id="warns"></div>
+
+  <section class="controls">
+    <span class="tabs" id="tabs"></span>
+    <span class="market-group">
+      <label class="chk"><input type="checkbox" id="mTWSE" checked /> 上市</label>
+      <label class="chk"><input type="checkbox" id="mTPEX" checked /> 上櫃</label>
+    </span>
+    <label>最低分數
+      <select id="minScore"></select>
+    </label>
+    <span class="count" id="count"></span>
+  </section>
+  <p class="note" id="stageNote"></p>
+
+  <main>
+    <div class="table-wrap">
+      <table id="tbl">
+        <thead>
+          <tr id="headRow"></tr>
+        </thead>
+        <tbody id="body"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="empty" hidden>這個分類目前沒有符合條件的股票。</p>
+  </main>
+
+  <footer>
+    <details open>
+    <summary>說明與資料來源</summary>
+    <p>這裡列的是<strong>疑似出貨風險訊號</strong>:法人淨賣出、大戶比例下降、股價從高點回落、帶量長黑、借券賣出餘額增加等現象同時出現。官方資料只能確認這些事實,<strong>不能證明是誰在賣、為什麼賣</strong>,也不代表主力正在出貨。</p>
+    <p>評分(0~100):法人調節 30、籌碼分散 25、高檔轉弱 20、量能異常 10、信用與借券 15。<strong>疑似出貨</strong> ≥ 70 分、<strong>注意</strong> 55~69 分,而且資料覆蓋率要 ≥ 85%。覆蓋率不足時列為<strong>暫定</strong>;20 日跌幅超過 25% 或距 60 日高點跌超過 30% 的列為<strong>已大幅下跌</strong>。只評 20 日平均成交值 ≥ 2,000 萬元的個股。點列可看各群組得分與借券資訊。</p>
+    <p><strong>怎麼看(實驗性,依 2026-04 ~ 10 的回測)</strong>:名單個股之後 20 日平均落後同期個股約 2%,5 日則幾乎沒有差異;而且期間內的最大上漲幅度和其他個股差不多。所以這份清單<strong>只適合當作 20 日左右的風險提示</strong>,不適合拿來抓短線放空時點。回測樣本很短,結論可能改變。</p>
+    <p class="disc">資料來源:臺灣證券交易所、證券櫃檯買賣中心、臺灣集中保管結算所。借券賣出含鉅額交易與券商避險,單日大量不一定代表看空。本系統只是籌碼與價量的統計篩選工具,<strong>不構成投資建議,亦非放空建議</strong>。</p>
+    </details>
+  </footer>
+  <script>/* 手機預設收合說明,把空間留給表格 */
+    if (matchMedia('(max-width: 560px)').matches) document.querySelector('footer details').open = false;</script>
+
+  <script src="dist.js"></script>
+</body>
+</html>
