@@ -210,6 +210,12 @@ T2 公布時間實測（獨立，crontab 自動執行）
 - [ ] 三次的 run 連結寫進回報；這個 workflow 已經刪除，不會 merge。
 **依賴**：T16 · **檔案**：`.github/workflows/concurrency-test.yml`（暫時） · **規模**：XS
 
+> **2026-10-17 結果**:`workflow_dispatch` 需要 workflow 已在預設分支,所以改用以 `origin/master` 為基礎的暫時分支 `ci/concurrency-test`、`on: push` 觸發(concurrency 行為和觸發方式無關)。三次 push 間隔約 13 秒(UTC 05:20:07、05:20:20、05:20:33):
+> - 第 1 次 [39005879320](https://github.com/weiyungwu/tw-inst-screener/actions/runs/39005879320):success,job 05:20:12 ~ 05:21:45
+> - 第 2 次 [39005894877](https://github.com/weiyungwu/tw-inst-screener/actions/runs/39005894877):**cancelled**(05:20:36 被第 3 次取代,job 沒有開始)
+> - 第 3 次 [39005909512](https://github.com/weiyungwu/tw-inst-screener/actions/runs/39005909512):success,job 05:21:47 開始(第 1 次結束後、晚於第 2 次的觸發時間)
+> - 暫時分支已從遠端與本機刪除,沒有 merge。
+
 ### Checkpoint P4
 - [ ] 全部測試和回歸比對通過
 - [ ] 開 PR 到 `weiyungwu:master`，**不 merge**
