@@ -6,6 +6,7 @@ const WORKFLOW_DISPATCH_URL =
   'https://api.github.com/repos/weiyungwu/tw-inst-screener/actions/workflows/update.yml/dispatches';
 
 const STAGES = ['ACCUMULATION', 'WATCH', 'OVERHEATED'];
+const DIST_STAGES = ['DISTRIBUTION', 'CAUTION', 'PROVISIONAL', 'COLLAPSED'];
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-headers': 'authorization',
@@ -50,6 +51,31 @@ async function apiScan(env, params) {
   return json({ scan_date: scan.scan_date, updated_at: scan.updated_at, quality: scan.quality, tdcc_weeks: scan.tdcc_weeks, count: stocks.length, stocks });
 }
 
+// GET /api/dist?stage=DISTRIBUTION,CAUTION&min_score=50&min_coverage=0.85&market=TPEX&limit=50
+// 疑似出貨風險訊號(dist.json);參數比照 /api/scan,另加 min_coverage(0~1)。market 是 market(t)(規格 §7.6)
+async function apiDist(env, params) {
+  const dist = await readJson(env, 'dist.json');
+  if (!dist) return json({ error: 'dist_not_ready' }, 503);
+
+  const stages = (params.get('stage') ?? 'DISTRIBUTION').toUpperCase().split(',').map((s) => s.trim());
+  const bad = stages.filter((s) => !DIST_STAGES.includes(s));
+  if (bad.length) return json({ error: 'invalid_stage', allowed: DIST_STAGES }, 400);
+  const market = params.get('market')?.toUpperCase();
+  if (market && market !== 'TWSE' && market !== 'TPEX') return json({ error: 'invalid_market', allowed: ['TWSE', 'TPEX'] }, 400);
+  const minScore = Number(params.get('min_score') ?? 0);
+  const minCoverage = Number(params.get('min_coverage') ?? 0);
+  if (!(minCoverage >= 0 && minCoverage <= 1)) return json({ error: 'invalid_min_coverage', hint: 'min_coverage 必須介於 0 和 1 之間' }, 400);
+  const limit = Math.min(Math.max(Number(params.get('limit') ?? 50) || 50, 1), 200);
+
+  const stocks = dist.stocks
+    .filter((s) => stages.includes(s.stage) && s.score >= minScore && s.coverage >= minCoverage && (!market || s.market === market))
+    .slice(0, limit);
+  return json({
+    scan_date: dist.scan_date, updated_at: dist.updated_at, run_id: dist.run_id, quality: dist.quality, sbl_status: dist.sbl_status,
+    config_version: dist.config_version, experimental: dist.experimental ?? null, note: dist.note, count: stocks.length, stocks,
+  });
+}
+
 // GET /api/cobuy?days=10&streak=5&insts=foreign,trust&market=TPEX&sort=foreign&limit=50
 // 法人同步買超:與網頁 index.html 相同的篩選(lib/cobuy.mjs),數值單位為張
 async function apiCobuy(env, params) {
@@ -86,11 +112,13 @@ async function apiCobuy(env, params) {
 }
 
 // GET /api/stock/2330 → features/23.json 中的 2330
+// distribution:出貨評分(帶自己的 scan_date、run_id)。null 代表「沒有出貨資料」(舊版分片、不在股票池、出貨評分失敗),
+// 不代表「沒有出貨風險」
 async function apiStock(env, code) {
   const shard = await readJson(env, `features/${code.slice(0, 2)}.json`);
   const stock = shard?.stocks?.[code];
   if (!stock) return json({ error: 'not_found' }, 404);
-  return json({ scan_date: shard.scan_date, updated_at: shard.updated_at, quality: shard.quality, ...stock });
+  return json({ scan_date: shard.scan_date, updated_at: shard.updated_at, quality: shard.quality, ...stock, distribution: stock.distribution ?? null });
 }
 
 export default {
@@ -98,6 +126,7 @@ export default {
     const { pathname, searchParams } = new URL(request.url);
     if (pathname === '/data.json') return r2Response(env, 'data.json');
     if (pathname === '/scan.json') return r2Response(env, 'scan.json');
+    if (pathname === '/dist.json') return r2Response(env, 'dist.json');
 
     if (pathname.startsWith('/api/')) {
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
@@ -105,6 +134,7 @@ export default {
       if (env.API_TOKEN && request.headers.get('authorization') !== `Bearer ${env.API_TOKEN}`) return json({ error: 'unauthorized' }, 401);
       if (pathname === '/api/scan') return apiScan(env, searchParams);
       if (pathname === '/api/cobuy') return apiCobuy(env, searchParams);
+      if (pathname === '/api/dist') return apiDist(env, searchParams);
       const m = pathname.match(/^\/api\/stock\/([1-9]\d{3})$/);
       if (m) return apiStock(env, m[1]);
       return json({ error: 'not_found' }, 404);
