@@ -167,17 +167,25 @@ function main() {
       stmt.run({ date: t, code: r.code, score: r.score, stage: r.stage, features: JSON.stringify(r.features), signals: JSON.stringify(r.signals) });
     }
   });
-  // dist_daily:股票池內全部個股;重算後階段有變動的檔數記在 ingest_log(同一天結果改變時可追蹤)
+  // dist_daily:股票池內全部個股;重算後階段有變動的檔數記在 ingest_log(同一天結果改變時可追蹤)。
+  // 寫入失敗(整批 rollback)也只停掉出貨:不寫 dist.json、分片 distribution 為 null,吸籌照常輸出
   if (dist) {
-    const dstmt = upsertStmt(db, 'dist_daily', ['date', 'code', 'score', 'coverage', 'stage', 'breakdown', 'signals', 'config_version', 'run_id'], ['date', 'code']);
-    let changed = 0;
-    tx(db, () => {
-      for (const [code, d] of dist.byCode) {
-        if (dist.prevStages.has(code) && dist.prevStages.get(code) !== d.stage) changed++;
-        dstmt.run({ date: t, code, score: d.score, coverage: d.coverage, stage: d.stage, breakdown: JSON.stringify(d.breakdown), signals: JSON.stringify(d.signals), config_version: d.config_version, run_id: RUN_ID });
-      }
-    });
-    if (dist.prevStages.size) logIngest(db, { source: 'dist', date: t, status: 'ok', rows: changed, message: `重算:階段變動 ${changed} 檔` });
+    try {
+      const dstmt = upsertStmt(db, 'dist_daily', ['date', 'code', 'score', 'coverage', 'stage', 'breakdown', 'signals', 'config_version', 'run_id'], ['date', 'code']);
+      let changed = 0;
+      tx(db, () => {
+        for (const [code, d] of dist.byCode) {
+          if (dist.prevStages.has(code) && dist.prevStages.get(code) !== d.stage) changed++;
+          dstmt.run({ date: t, code, score: d.score, coverage: d.coverage, stage: d.stage, breakdown: JSON.stringify(d.breakdown), signals: JSON.stringify(d.signals), config_version: d.config_version, run_id: RUN_ID });
+        }
+      });
+      if (dist.prevStages.size) logIngest(db, { source: 'dist', date: t, status: 'ok', rows: changed, message: `重算:階段變動 ${changed} 檔` });
+    } catch (e) {
+      process.stderr.write(`⚠ dist_daily 寫入失敗,只輸出吸籌: ${e.message}\n`);
+      logIngest(db, { source: 'dist', date: t, status: 'error', message: `dist_daily: ${e.message}` });
+      dist = null;
+      for (const r of results) r.distribution = null;
+    }
   }
   db.close();
 
