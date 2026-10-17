@@ -49,6 +49,8 @@ const SOURCES = {
     `https://www.tpex.org.tw/web/stock/3insti/qfii/qfii_result.php?l=zh-tw&o=json&d=${roc(d)}`,
     `https://www.tpex.org.tw/web/stock/3insti/qfii/qfii_result.php?l=zh-tw&o=data&d=${roc(d)}`,
   ],
+  'twse-sbl': (d) => [`https://www.twse.com.tw/exchangeReport/TWT93U?response=json&date=${ymd(d)}`],
+  'tpex-sbl': (d) => [`https://www.tpex.org.tw/www/zh-tw/margin/sbl?date=${slash(d)}&response=json`],
   tdcc: () => ['https://opendata.tdcc.com.tw/getOD.ashx?id=1-5'],
 };
 

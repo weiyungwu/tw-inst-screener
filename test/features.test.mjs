@@ -158,3 +158,137 @@ test('近 5 日法人(外資+投信)合計:四維籌碼燈第 3 條', () => {
   s.inst.set('d25', { foreign_net: -5000, trust_net: 0, dealer_net: 0 });
   assert.equal(computeFeatures(s).inst_net_5, 4 * 400 - 5000);
 });
+
+// ---- 出貨規格 §6 新增特徵 ----
+
+test('inst_sell_days_20:D20 中外資+投信 < 0 的天數,0 不算賣(和 inst_buy_days_20 對稱)', () => {
+  const s = series(25);
+  mkDays(25).slice(5).forEach((d, i) => s.inst.set(d, { foreign_net: i % 4 === 0 ? 0 : i % 2 ? -300 : 300, trust_net: 0, dealer_net: 0 }));
+  // i = 0..19:i%4==0 → 0(5 天)、奇數 → 賣(10 天)、其餘 → 買(5 天)
+  const f = computeFeatures(s);
+  assert.equal(f.inst_sell_days_20, 10);
+  assert.equal(f.inst_buy_days_20, 5);
+});
+
+test('inst_sell_days_20:窗口有效值不足 80% 時為 null(停牌不可當成沒賣)', () => {
+  const s = series(25);
+  for (const d of ['d10', 'd11', 'd12', 'd13', 'd14']) { s.price.delete(d); s.inst.delete(d); }
+  assert.equal(computeFeatures(s).inst_sell_days_20, null);
+});
+
+test('big400_down_weeks:從最新一週往回連續週減的週數,持平就中斷', () => {
+  const w = (big400) => ({ big400, big1000: 0, retail: 0, holders: 1 });
+  assert.equal(tdccFeatures([w(54), w(53), w(52), w(51)]).big400_down_weeks, 3);
+  assert.equal(tdccFeatures([w(50), w(53), w(52), w(51)]).big400_down_weeks, 2, "53 之前是 50,連減在那裡中斷");
+  assert.equal(tdccFeatures([w(53), w(52), w(52), w(51)]).big400_down_weeks, 1, '持平不算減少');
+  assert.equal(tdccFeatures([w(50), w(51)]).big400_down_weeks, 0);
+  assert.equal(tdccFeatures([w(50)]).big400_down_weeks, null, '只有一週無法判斷');
+});
+
+test('drawdown_60:close(t) ÷ D60 最高價 − 1;在高點為 0 附近、不足 60 天為 null', () => {
+  near(computeFeatures(series(65)).drawdown_60, 164 / 165 - 1, 'drawdown_60'); // 上漲序列:高點是 close(t)+1
+  // 前段漲到 200,之後跌回 150:回落 = 150 / 201 − 1
+  const s = series(65, { closeOf: (i) => (i === 30 ? 200 : 150) });
+  near(computeFeatures(s).drawdown_60, 150 / 201 - 1, 'drawdown_60');
+  assert.equal(computeFeatures(series(59)).drawdown_60, null);
+});
+
+test('below_ma20:收盤低於 MA20 為 true;等於不算;MA20 或當日收盤缺值時為 null', () => {
+  assert.equal(computeFeatures(series(25)).below_ma20, false); // 上漲序列 close(t) > MA20
+  assert.equal(computeFeatures(series(25, { closeOf: (i) => 200 - i })).below_ma20, true);
+  assert.equal(computeFeatures(series(25, { closeOf: () => 100 })).below_ma20, false, '等於 MA20 不算跌破');
+  assert.equal(computeFeatures(series(19)).below_ma20, null);
+  const s = series(25);
+  s.price.set('d25', { ...s.price.get('d25'), close: null });
+  assert.equal(computeFeatures(s).below_ma20, null, '當日無收盤不可當成跌破');
+});
+
+// 帶量長黑測試用序列:平盤量 1000、收盤 100;在 at 那天放一根 K 棒
+function dumpSeries(n, at, bar) {
+  const s = series(n, { closeOf: () => 100 });
+  for (const d of s.days) s.price.set(d, { open: 100, high: 101, low: 99, close: 100, volume: 1000, value: 100000 });
+  if (at) s.price.set(at, { high: 101, low: 90, value: 0, ...bar });
+  return s;
+}
+
+test('dump_days_20:量 = 前 5 日均量 × 1.5、收黑、跌 4% → 算一天', () => {
+  assert.equal(computeFeatures(dumpSeries(25, 'd20', { open: 100, close: 96, volume: 1500 })).dump_days_20, 1);
+});
+
+test('dump_days_20:「前 5 日」不含當天(含當天的話基準被自己的大量墊高,1500 < 1100 × 1.5 會漏算)', () => {
+  // 前 5 日均量 1000 → 門檻 1500;若錯把當天算進去:(4×1000 + 1500)/5 = 1100 → 門檻 1650,這根就不會算
+  assert.equal(computeFeatures(dumpSeries(25, 'd20', { open: 100, close: 96, volume: 1500 })).dump_days_20, 1);
+  assert.equal(computeFeatures(dumpSeries(25, 'd20', { open: 100, close: 96, volume: 1499 })).dump_days_20, 0);
+});
+
+test('dump_days_20:收平或收紅不算;跌幅不到 3% 不算', () => {
+  assert.equal(computeFeatures(dumpSeries(25, 'd20', { open: 96, close: 96, volume: 3000 })).dump_days_20, 0, '收平(close = open)');
+  assert.equal(computeFeatures(dumpSeries(25, 'd20', { open: 90, close: 96, volume: 3000 })).dump_days_20, 0, '跳空低開收紅');
+  assert.equal(computeFeatures(dumpSeries(25, 'd20', { open: 100, close: 98, volume: 3000 })).dump_days_20, 0, '只跌 2%');
+});
+
+test('dump_days_20:只看 D20,更早的長黑不算', () => {
+  assert.equal(computeFeatures(dumpSeries(25, 'd05', { open: 100, close: 90, volume: 5000 })).dump_days_20, 0);
+});
+
+test('dump_days_20:可判斷的天數不足 80% 時為 null(每天要有前 5 日均量,20 天資料只有 15 天可判斷)', () => {
+  assert.equal(computeFeatures(dumpSeries(21)).dump_days_20, 0); // D20 = i 1..20,i ≥ 5 才有前 5 日 → 16 天 = 80%
+  assert.equal(computeFeatures(dumpSeries(20)).dump_days_20, null); // 15 天 < 80%
+  const s = dumpSeries(25);
+  for (const d of ['d10', 'd11', 'd12', 'd13', 'd14']) s.price.delete(d); // 停牌 5 天
+  assert.equal(computeFeatures(s).dump_days_20, null);
+});
+
+// 借券:發行股數 1,000,000(series 預設);sbl 由 balanceOf(i) 產生
+function withSbl(n, balanceOf) {
+  const s = series(n);
+  s.sbl = new Map(s.days.map((d, i) => [d, { sbl_balance: balanceOf(i) }]));
+  return s;
+}
+
+test('sbl_chg_20_pct、sbl_ratio:分母用發行股數(小基數不放大),單位 %', () => {
+  const f = computeFeatures(withSbl(25, (i) => 10_000 + i * 500)); // t=24:22,000;t−20=4:12,000
+  near(f.sbl_chg_20_pct, 1.0, 'sbl_chg_20_pct'); // (22000 − 12000) / 1,000,000 × 100
+  near(f.sbl_ratio, 2.2, 'sbl_ratio');
+});
+
+test('借券 t 日缺值(當晚還沒公布)整組為 null,不可拿 t−1 頂替(回測會變成偷看晚上才公布的資料)', () => {
+  const s = withSbl(25, () => 10_000);
+  s.sbl.delete('d25');
+  const f = computeFeatures(s);
+  assert.equal(f.sbl_chg_20_pct, null);
+  assert.equal(f.sbl_ratio, null);
+});
+
+test('借券 t−20 缺值時只有 20 日變化為 null,餘額比照算', () => {
+  const s = withSbl(25, () => 10_000);
+  s.sbl.delete('d05');
+  const f = computeFeatures(s);
+  assert.equal(f.sbl_chg_20_pct, null);
+  near(f.sbl_ratio, 1.0, 'sbl_ratio');
+});
+
+test('借券餘額 > 發行股數時整組為 null(增減資時發行股數不同步,算出來的 % 沒有意義)', () => {
+  const f = computeFeatures(withSbl(25, (i) => (i === 24 ? 1_000_001 : 10_000)));
+  assert.equal(f.sbl_chg_20_pct, null);
+  assert.equal(f.sbl_ratio, null);
+  near(computeFeatures(withSbl(25, () => 1_000_000)).sbl_ratio, 100, '剛好等於發行股數照算');
+});
+
+test('沒有借券資料(未傳 sbl)時借券特徵為 null,不可當成 0', () => {
+  const f = computeFeatures(series(25));
+  assert.equal(f.sbl_chg_20_pct, null);
+  assert.equal(f.sbl_ratio, null);
+});
+
+test('short_margin_ratio:融券 ÷ 融資 × 100;融資 < 100 張為 null(分母太小比例會失真)', () => {
+  const s = series(25);
+  s.margin.set('d25', { margin_balance: 200, short_balance: 50 });
+  near(computeFeatures(s).short_margin_ratio, 25, 'short_margin_ratio');
+  s.margin.set('d25', { margin_balance: 100, short_balance: 50 });
+  near(computeFeatures(s).short_margin_ratio, 50, '剛好 100 張照算');
+  s.margin.set('d25', { margin_balance: 99, short_balance: 50 });
+  assert.equal(computeFeatures(s).short_margin_ratio, null);
+  s.margin.set('d25', { margin_balance: 200, short_balance: null });
+  assert.equal(computeFeatures(s).short_margin_ratio, null, '融券缺值不可當 0');
+});

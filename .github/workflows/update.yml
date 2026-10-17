@@ -2,9 +2,12 @@ name: 更新法人買賣超資料
 
 on:
   schedule:
-    # GitHub cron 為 UTC。台股法人資料約收盤後傍晚定案,排兩個時段(允許延遲)。
+    # GitHub cron 為 UTC(Cloudflare 排程準時觸發,這裡是備援)。台股法人資料約收盤後傍晚定案,18:00、20:00 各一次(允許延遲)。
     - cron: '0 10 * * 1-5'   # 台北 18:00
     - cron: '0 12 * * 1-5'   # 台北 20:00
+    # 借券賣出約 20:30、22:30 公布,22:45 再跑一次補當天借券、重算出貨分數(其他來源已存在會跳過)。
+    # 不帶任何日期參數:每次執行都用當下時間與 DB 決定處理哪天,concurrency 取代待執行的那次才不會漏資料(出貨規格 §5.1)
+    - cron: '45 14 * * 1-5'  # 台北 22:45
     # 資料改存 R2 後不再 commit,repo 60 天無活動 GitHub 會停用排程;每月重新啟用一次。
     - cron: '0 0 1 * *'      # 每月 1 日 台北 08:00(只跑 keepalive)
   workflow_dispatch:          # 也可在 Actions 頁面手動觸發
@@ -79,7 +82,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: 計算吸籌分數
+      - name: 計算吸籌與出貨分數
+        # 出貨評分在 score.mjs 內獨立 try/catch:出貨失敗時吸籌照常輸出,只是不產生 docs/dist.json(下一步會失敗並標示)
         run: node scripts/score.mjs
         env:
           TZ: Asia/Taipei
@@ -90,6 +94,18 @@ jobs:
           for f in data/features/*.json; do
             npx -y wrangler@4 r2 object put "tw-stocks-data/features/$(basename "$f")" --file "$f" --content-type application/json --remote
           done
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # ---- 出貨掃描器 ----
+      - name: 上傳 dist 結果
+        # 放在吸籌上傳之後,失敗不影響吸籌(出貨規格 §5.2)。沒有 dist.json 代表本次出貨評分失敗:
+        # R2 保留上一版,前端依 scan_date 顯示「出貨結果停在…」
+        continue-on-error: true
+        run: |
+          test -s docs/dist.json || { echo "::warning::本次出貨評分失敗,沒有產生 docs/dist.json"; exit 1; }
+          npx -y wrangler@4 r2 object put tw-stocks-data/dist.json --file docs/dist.json --content-type application/json --remote
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

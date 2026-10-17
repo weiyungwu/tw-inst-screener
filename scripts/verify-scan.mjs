@@ -18,7 +18,7 @@ const { values: args } = parseArgs({ options: { stats: { type: 'boolean', defaul
 function printStats(db) {
   const tables = [
     ['trading_days', 'date'], ['inst_daily', 'date'], ['price_daily', 'date'],
-    ['margin_daily', 'date'], ['qfii_daily', 'date'], ['tdcc_weekly', 'data_date'], ['scan_daily', 'date'],
+    ['margin_daily', 'date'], ['qfii_daily', 'date'], ['sbl_daily', 'date'], ['tdcc_weekly', 'data_date'], ['scan_daily', 'date'],
   ];
   console.log('表              日期數    筆數  範圍');
   for (const [t, col] of tables) {
@@ -40,6 +40,18 @@ function printStats(db) {
     ORDER BY d.date`).all();
   console.log(`\n交易日缺漏(來源/市場): ${gaps.length ? '' : '無'}`);
   for (const g of gaps) console.log(`  ${g.date} ${g.tbl} ${g.market}`);
+
+  // 借券:只看第一筆借券資料之後的交易日(更早的日期沒有回補,不算缺漏);市場用 sbl_daily.market
+  const sblGaps = db.prepare(`
+    SELECT d.date, s.market FROM trading_days d
+    CROSS JOIN (SELECT 'TWSE' AS market UNION ALL SELECT 'TPEX') s
+    WHERE d.twse_ok = 1 AND d.tpex_ok = 1 AND d.date >= (SELECT MIN(date) FROM sbl_daily)
+      AND NOT EXISTS (SELECT 1 FROM sbl_daily b WHERE b.date = d.date AND b.market = s.market)
+    ORDER BY d.date, s.market`).all();
+  const sblDays = db.prepare('SELECT market, COUNT(DISTINCT date) AS days, MIN(date) AS lo, MAX(date) AS hi FROM sbl_daily GROUP BY market').all();
+  console.log(`\n借券 sbl_daily: ${sblDays.map((r) => `${r.market} ${r.days} 日(${r.lo} ~ ${r.hi})`).join(' / ') || '無資料'}`);
+  console.log(`借券缺漏(交易日/市場): ${sblGaps.length ? '' : '無'}`);
+  for (const g of sblGaps) console.log(`  ${g.date} ${g.market}`);
 
   const errors = db.prepare(`SELECT run_at, source, date, message FROM ingest_log WHERE status = 'error' ORDER BY id DESC LIMIT 10`).all();
   console.log(`\n最近 ingest 錯誤: ${errors.length ? '' : '無'}`);
@@ -75,6 +87,13 @@ function printScan(db) {
   const miss = {};
   for (const r of rows) if (r.stage !== 'EXCLUDED') for (const s of r.signals) if (s.startsWith('missing:')) miss[s.slice(8)] = (miss[s.slice(8)] ?? 0) + 1;
   console.log(`  缺值特徵(可評分個股): ${Object.entries(miss).map(([k, v]) => `${k} ${v}`).join(' / ') || '無'}`);
+
+  // 出貨規格新增特徵:非 null 檔數(可評分個股),以及借券 20 日增加最多的 10 檔
+  const DIST = ['inst_sell_days_20', 'big400_down_weeks', 'drawdown_60', 'below_ma20', 'dump_days_20', 'sbl_chg_20_pct', 'sbl_ratio', 'short_margin_ratio'];
+  const scored = rows.filter((r) => r.stage !== 'EXCLUDED');
+  console.log(`  出貨特徵有值(可評分 ${scored.length} 檔): ${DIST.map((k) => `${k} ${scored.filter((r) => r.features[k] != null).length}`).join(' / ')}`);
+  const sblTop = scored.filter((r) => r.features.sbl_chg_20_pct != null).sort((a, b) => b.features.sbl_chg_20_pct - a.features.sbl_chg_20_pct).slice(0, 10);
+  console.log(`  借券 20 日增加(%股本)前 ${sblTop.length}: ${sblTop.map((r) => `${r.code}${r.name} ${num(r.features.sbl_chg_20_pct)}(餘額 ${num(r.features.sbl_ratio)}%、券資比 ${num(r.features.short_margin_ratio, 1)})`).join(' / ') || '無'}`);
 
   const top = rows.filter((r) => r.stage === 'ACCUMULATION').slice(0, 20);
   console.log(`\nACCUMULATION 前 ${top.length} 檔(法人/集中/價格/量能/融資):`);

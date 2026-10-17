@@ -3,7 +3,7 @@
 自動找出**最近數個交易日,勾選的法人(外資/投信/自營商)「都」買超**的台股(上市 + 上櫃),做成一個
 **公開網頁**,手機/任何電腦用網址即可查看,每個交易日收盤後**自動更新**,你的電腦不用開機。
 
-- 正式網址:<https://tw-stocks.happytoo.cc>(首頁:法人同步買超;`/scan.html`:主力吸籌掃描器)
+- 正式網址:<https://tw-stocks.happytoo.cc>(首頁:法人同步買超;`/scan.html`:主力吸籌掃描器;`/dist.html`:疑似出貨風險訊號)
 - 手機版面自適應:代號、名稱兩欄凍結可橫滑對照,頁尾說明預設收合。
 
 ## 篩選條件
@@ -16,7 +16,7 @@
 
 ## 運作方式
 ```
-Cloudflare Cron Triggers(週一至五 台北 18:00 / 20:00 準時)→ 觸發 GitHub Actions
+Cloudflare Cron Triggers(週一至五 台北 18:00 / 20:00 / 22:45 準時)→ 觸發 GitHub Actions
 GitHub Actions(自身排程常延遲,保留為備援)
    └─ scripts/build-data.mjs  抓 TWSE + TPEX 三大法人買賣超 → 篩選 → data.json → 上傳 R2
 Cloudflare Workers
@@ -123,5 +123,47 @@ for f in data/features/*.json; do npx wrangler r2 object put "tw-stocks-data/fea
 npx wrangler dev                         # http://localhost:8787/scan.html、/api/scan、/api/stock/2330
 ```
 
+## 疑似出貨風險訊號(`/dist.html`)
+吸籌掃描器的反面:找出法人淨賣出、大戶比例下降、股價從高點回落、帶量長黑、借券賣出餘額增加等現象同時出現的個股。
+完整規格見 [specs/distribution-scanner-spec.md](specs/distribution-scanner-spec.md),校準結果見 [specs/distribution-calibration.md](specs/distribution-calibration.md)。
+
+> **用語**:官方資料只能確認「法人淨賣出」「借券餘額增加」這類事實,**不能證明是誰在賣、為什麼賣**。
+> 所以頁面與 API 一律稱「**疑似出貨風險訊號**」,不寫「主力正在出貨」;程式與檔名沿用 `distribution`。
+
+### 評分(d-v1.0,**實驗性**;門檻在 `lib/distribution.mjs` 的 `CONFIG`,和吸籌不共用)
+| 群組 | 滿分 | 說明 |
+|---|---|---|
+| 法人調節 | 30 | 20 日淨賣超占股本比、20 日內賣超天數 |
+| 籌碼分散 | 25 | 400 張以上大戶連續減少週數、股東人數 4 週增加超過 2%、大戶比例 4 週減少 |
+| 高檔轉弱 | 20 | 距 60 日高點回落 3%~15%、仍在季線上 5% 以上、跌破月線 |
+| 量能異常 | 10 | 20 日內帶量長黑天數(量 ≥ 前 5 日均量 × 1.5、收黑、跌 ≥ 3%) |
+| 信用與借券 | 15 | 借券賣出餘額 20 日增加占股本比、融資 20 日增加超過 10% |
+
+- **缺資料不加分也不扣分**:特徵算不出來時該項 0 分,另外算**覆蓋率**(算得出來的配分 ÷ 100)。0 分代表「無法判斷」,不代表「沒有風險」。
+- **階段**:`DISTRIBUTION` ≥ 70、`CAUTION` 55~69,都要覆蓋率 ≥ 85%;分數夠但覆蓋率不足為 `PROVISIONAL`(暫定);
+  20 日跌幅 > 25% 或距 60 日高點 > 30% 為 `COLLAPSED`(已大幅下跌,不適用高檔派發判斷,**不代表風險解除**);
+  20 日均成交值 < 2,000 萬為 `EXCLUDED`。
+- **怎麼解讀(依 2026-04 ~ 10 回測,樣本短)**:名單個股之後 **20 日**平均落後同期個股約 2%,**5 日幾乎沒有差異**;
+  期間內的最大上漲幅度和其他個股差不多。只適合當作 20 日左右的風險提示,**不適合抓短線放空時點**。
+  籌碼分散組只有數週集保資料,門檻尚未經前瞻驗證。
+
+### 借券賣出與 22:45 排程
+- 新增資料源:TWSE `TWT93U`、TPEX `margin/sbl`(借券賣出餘額,單位股),存 `sbl_daily`;每列都要通過勾稽,任一不符整個市場當天不寫入。
+- 借券約 20:30、22:30 公布,比其他資料晚,所以多一個 **22:45** 排程補當天借券、重算出貨分數(其他來源已存在會跳過)。
+  18:00、20:00 那兩次的出貨結果會帶 `sbl_pending`,覆蓋率下降,頁面會提示「借券資料約 22:45 更新」。
+- 出貨評分或上傳失敗不影響吸籌:`dist.json` 停在上一版,頁面依 `scan_date` 顯示「出貨結果停在…」。
+
+### API
+- `GET /dist.json`:今日 `DISTRIBUTION` / `CAUTION` / `PROVISIONAL` / `COLLAPSED` 清單,頂層有 `sbl_status`(各市場借券是否已公布)、`run_id`、`experimental`
+- `GET /api/dist?stage=DISTRIBUTION,CAUTION&min_score=50&min_coverage=0.85&market=TPEX&limit=50`:參數比照 `/api/scan`,另加 `min_coverage`(0~1)
+- `GET /api/stock/2330` 多一個 `distribution` 欄位(分數、覆蓋率、階段、訊號,帶自己的 `scan_date`、`run_id`)。
+  **`distribution: null` 代表「沒有出貨資料」,不代表「沒有出貨風險」。**
+
+```bash
+node scripts/backfill.mjs --sbl          # 回補借券賣出(60 個交易日約 6 分鐘以上)
+node scripts/calibrate-dist.mjs          # 逐日重算出貨評分,產生校準報告(唯讀)
+node scripts/regress.mjs snapshot|compare  # 確認吸籌輸出沒有被改到
+```
+
 ## 免責
-本專案僅供研究參考,**非投資建議**。資料以官方公告為準,程式可能因官方端點調整而需維護。
+本專案僅供研究參考,**非投資建議**;疑似出貨風險訊號**亦非放空建議**。資料以官方公告為準,程式可能因官方端點調整而需維護。

@@ -1,10 +1,11 @@
 // ===========================================================================
 // backfill.mjs — 在本機回補歷史資料(手動執行一次;請求間隔 ≥ 3 秒,約 25~30 分鐘)
 //
-// 執行:  TZ=Asia/Taipei node scripts/backfill.mjs [--days 60] [--sources inst,price,margin,qfii]
-//                                                  [--from YYYY-MM-DD] [--to YYYY-MM-DD]
+// 執行:  TZ=Asia/Taipei node scripts/backfill.mjs [--days 60] [--sources inst,price,margin,qfii,sbl]
+//                                                  [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--sbl]
 //   --days    由 --to(預設今天)往回回補的交易日數,預設 60;有 --from 時改以 --from 為下限
 //   --sources 只處理指定的來源群組;非 inst 來源只會補「法人已完整」的日期
+//   --sbl     只回補借券賣出(等同 --sources sbl;60 個交易日 × 2 市場 × 3 秒,約 6 分鐘)
 //
 //        TZ=Asia/Taipei node scripts/backfill.mjs --tdcc-weeks 2
 //   --tdcc-weeks  只回補集保:從集保官網查詢頁回補「最新一週之前」的 N 週(最新一週由 ingest-weekly 抓 CSV)。
@@ -29,6 +30,7 @@ const { values: args } = parseArgs({
     from: { type: 'string' },
     to: { type: 'string' },
     'tdcc-weeks': { type: 'string' },
+    sbl: { type: 'boolean', default: false },
   },
 });
 
@@ -79,7 +81,7 @@ async function main() {
     return;
   }
 
-  const groups = args.sources.split(',').map((s) => s.trim());
+  const groups = args.sbl ? ['sbl'] : args.sources.split(',').map((s) => s.trim());
   const bad = groups.filter((g) => !GROUPS.includes(g));
   if (bad.length) throw new Error(`未知的來源: ${bad.join(', ')}(可用: ${GROUPS.join(', ')})`);
   const days = Number(args.days);
