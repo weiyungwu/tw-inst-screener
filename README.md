@@ -1,12 +1,21 @@
-# 台股：法人同步買超選股器
+# 台股籌碼掃描器：法人同步買超 × 主力吸籌 × 疑似出貨風險
 
-自動找出**最近數個交易日,勾選的法人(外資/投信/自營商)「都」買超**的台股(上市 + 上櫃),做成一個
-**公開網頁**,手機/任何電腦用網址即可查看,每個交易日收盤後**自動更新**,你的電腦不用開機。
+每個交易日收盤後,自動抓取證交所、櫃買中心、集保結算所的公開資料,替上市櫃普通股做三種籌碼篩選,做成**公開網頁**與 **API**。
+手機或任何電腦用網址就能查看,資料自動更新,你的電腦不用開機。
 
-- 正式網址:<https://tw-stocks.happytoo.cc>(首頁:法人同步買超;`/scan.html`:主力吸籌掃描器;`/dist.html`:疑似出貨風險訊號)
-- 手機版面自適應:代號、名稱兩欄凍結可橫滑對照,頁尾說明預設收合。
+- 正式網址:<https://tw-stocks.happytoo.cc>
 
-## 篩選條件
+| 頁面 | 網址 | 回答的問題 |
+|---|---|---|
+| 法人同步買超 | `/`(首頁) | 最近幾天,勾選的法人是不是**都**在買? |
+| 主力吸籌掃描 | `/scan.html` | 有沒有人在股價還沒動時悄悄佈局?(0～100 分) |
+| 疑似出貨風險 | `/dist.html` | 法人賣、大戶減、高檔轉弱、借券增加等現象是否同時出現?(0～100 分,實驗性) |
+
+- **介面**:三頁共用頁籤導覽與篩選元件(`docs/ui.css`);右上角可切換深色/淺色,會記住選擇,沒選過時跟隨系統(`docs/theme.js`)。
+- **手機**:代號、名稱兩欄凍結可橫滑對照;點列展開的明細固定在畫面內;頁尾說明預設收合。
+- **API**:給 Hermes Agent 等 AI agent 使用,見下方各節與 [specs/hermes-tool.md](specs/hermes-tool.md)。
+
+## 法人同步買超(首頁)
 每一檔股票,網頁上**勾選的法人**(預設外資+自營商,可加勾投信)**各自**都要滿足:
 - 外資含陸資;自營商含自行+避險
 1. 在「累計天數」(預設 10 個交易日)內,**淨買超合計 > 0**
@@ -18,22 +27,28 @@
 ```
 Cloudflare Cron Triggers(週一至五 台北 18:00 / 20:00 / 22:45 準時)→ 觸發 GitHub Actions
 GitHub Actions(自身排程常延遲,保留為備援)
-   └─ scripts/build-data.mjs  抓 TWSE + TPEX 三大法人買賣超 → 篩選 → data.json → 上傳 R2
+   ├─ scripts/build-data.mjs    抓 TWSE + TPEX 三大法人 → data.json → 上傳 R2(首頁)
+   └─ 從 R2 下載 db/history.sqlite
+        ├─ scripts/ingest-daily.mjs   法人、行情、融資、外資持股、借券賣出
+        ├─ scripts/ingest-weekly.mjs  集保股權分散(每週)
+        ├─ scripts/score.mjs          吸籌與出貨評分 → scan.json、dist.json、features/*.json
+        └─ 上傳資料庫與結果到 R2
 Cloudflare Workers
-   ├─ docs/                   靜態頁面(index.html / app.js),push 到 master 時自動部署
-   └─ worker/index.js         /data.json 從 R2(bucket tw-stocks-data)讀出回傳;排程時觸發 GitHub Actions
+   ├─ docs/                     靜態頁面,push 到 master 時自動部署
+   └─ worker/index.js           /data.json、/scan.json、/dist.json、/api/* 從 R2 讀出;排程時觸發 GitHub Actions
 ```
-- 資料來源:臺灣證券交易所(TWSE T86)、證券櫃檯買賣中心(TPEX)。
-- 前端讀取同源 `/data.json`,沒有 CORS 問題;資料更新只寫 R2,不 commit 回 repo、也不需重新部署。
-- 抓資料腳本**零 npm 依賴**,只需 Node 18+;部署與上傳用 `wrangler`(需 Node 22+)。
+- 資料來源:臺灣證券交易所(TWSE)、證券櫃檯買賣中心(TPEX)、臺灣集中保管結算所(TDCC)。
+- 前端讀取同源 JSON,沒有 CORS 問題;資料更新只寫 R2,不 commit 回 repo,也不需重新部署。
+- 前端沒有 build step;抓資料與評分腳本**零 npm 依賴**,需 Node ≥ 22.13(使用內建 `node:sqlite`);部署與上傳用 `wrangler`。
 
 ## 本機開發
 ```bash
-node scripts/build-data.mjs     # 重新抓資料,產生 docs/data.json(建議 TZ=Asia/Taipei)
+node scripts/build-data.mjs     # 重新抓首頁資料,產生 docs/data.json(建議 TZ=Asia/Taipei)
 node scripts/serve.mjs          # http://localhost:8080 預覽網頁
 node scripts/verify.mjs         # 列印目前符合條件的股票(自我檢查用)
 ```
-> `docs/data.json` 只存在本機(已列入 `.gitignore`、`docs/.assetsignore`),不會被 commit 或部署。
+> `docs/data.json`、`scan.json`、`dist.json` 只存在本機(已列入 `.gitignore`、`docs/.assetsignore`),不會被 commit 或部署。
+> 只想看畫面時,可以直接從正式站下載這三個檔案放進 `docs/`。
 > 若要連同 Worker + R2 一起在本機測試:
 > ```bash
 > npx wrangler r2 object put tw-stocks-data/data.json --file docs/data.json --local
@@ -75,7 +90,8 @@ node scripts/verify.mjs         # 列印目前符合條件的股票(自我檢查
 - `scan.json` 帶 `config_version`,調整規則時遞增,回測可區分新舊版本。
 
 ### 四維燈號
-掃描頁「四維」欄(可依紅燈數排序)顯示籌碼、量能、均線、型態四顆燈,紅燈偏多、綠燈不成立、灰色為資料不足(不當綠燈)。
+吸籌頁與出貨頁的「四維」欄(可依紅燈數排序)顯示籌碼、量能、均線、型態四顆燈,紅燈偏多、綠燈不成立、灰色為資料不足(不當綠燈)。
+在出貨頁,紅燈多代表價量仍偏多,是出貨訊號的**反證**;燈號不影響吸籌或出貨分數。
 規則見 [specs/stock-4d-3d-trade-report_v4.md](specs/stock-4d-3d-trade-report_v4.md) §5,實作在 `lib/fourd.mjs`:
 - **籌碼**:20 日法人淨買超 ≥ 股本 0.2%、20 日內買超 ≥ 10 天、近 5 日法人合計 > 0
 - **量能**:帶量上攻(量 ≥ 1.5 × 前 5 日均量且收紅),或量比 1.0~1.8 且非爆量長黑
@@ -94,7 +110,8 @@ node scripts/verify.mjs         # 列印目前符合條件的股票(自我檢查
   - `GET /api/cobuy?days=10&streak=5&insts=foreign,trust&market=TPEX&sort=foreign&limit=50`:法人同步買超,篩選規則與首頁相同(單位張)
   - Hermes Agent 等 agent 的工具定義與系統提示見 [specs/hermes-tool.md](specs/hermes-tool.md);
     抓資料用的 skill 見 [specs/台股籌碼資料_Skill_v1.2.md](specs/台股籌碼資料_Skill_v1.2.md);
-    報告 skill:偏多交易劇本 [specs/stock-4d-3d-trade-report_v4.md](specs/stock-4d-3d-trade-report_v4.md)、疑似出貨風險與持股防守 [specs/stock-dist-risk-report_v1.md](specs/stock-dist-risk-report_v1.md)
+    報告 skill:偏多交易劇本 [specs/stock-4d-3d-trade-report_v4.md](specs/stock-4d-3d-trade-report_v4.md)、疑似出貨風險與持股防守 v1.1 [specs/stock-dist-risk-report_v1.md](specs/stock-dist-risk-report_v1.md)(含結構檢查、假突破/假跌破、推翻條件)
+  - Hermes 透過 Telegram 安裝的是 skill 檔的**複本**:repo 裡的 skill 更新後,要把新檔再傳給 Hermes 並請它取代同名 skill。
 
 ```bash
 # 本機(建議先 export TZ=Asia/Taipei)
@@ -155,7 +172,7 @@ npx wrangler dev                         # http://localhost:8787/scan.html、/ap
 - 出貨評分或上傳失敗不影響吸籌:`dist.json` 停在上一版,頁面依 `scan_date` 顯示「出貨結果停在…」。
 
 ### API
-- `GET /dist.json`:今日 `DISTRIBUTION` / `CAUTION` / `PROVISIONAL` / `COLLAPSED` 清單,頂層有 `sbl_status`(各市場借券是否已公布)、`run_id`、`experimental`
+- `GET /dist.json`:今日 `DISTRIBUTION` / `CAUTION` / `PROVISIONAL` / `COLLAPSED` 清單(每檔含四維燈號 `lights`),頂層有 `sbl_status`(各市場借券是否已公布)、`run_id`、`experimental`
 - `GET /api/dist?stage=DISTRIBUTION,CAUTION&min_score=50&min_coverage=0.85&market=TPEX&limit=50`:參數比照 `/api/scan`,另加 `min_coverage`(0~1)
 - `GET /api/stock/2330` 多一個 `distribution` 欄位(分數、覆蓋率、階段、訊號,帶自己的 `scan_date`、`run_id`)。
   **`distribution: null` 代表「沒有出貨資料」,不代表「沒有出貨風險」。**
