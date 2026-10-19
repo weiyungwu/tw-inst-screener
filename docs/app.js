@@ -53,7 +53,7 @@ function setupControls() {
   state.streakDays = Math.min(state.streakDays, total);
   const meta = document.getElementById('meta');
   meta.innerHTML =
-    `更新時間:<strong>${d.updated_at}</strong><span class="days">　|　交易日:${d.trading_days.join('、')}</span>`;
+    `<span>更新時間 <strong>${d.updated_at}</strong></span><span class="days">交易日 ${d.trading_days.join('、')}</span>`;
 
   const sumSel = document.getElementById('sumDays');
   const stSel = document.getElementById('streakDays');

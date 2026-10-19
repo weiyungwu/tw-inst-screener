@@ -6,46 +6,32 @@
   <title>疑似出貨風險</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    /* 出貨風險頁專用;共用樣式在 style.css 不修改。強調色改成橘色,和吸籌(藍)區分,避免把清單看成買進名單 */
+    /* 出貨風險頁專用;共用樣式在 style.css、ui.css。強調色改成橘色,和吸籌(藍)區分,避免把清單看成買進名單 */
     :root { --accent: #ff9f43; }
-    .nav { float: right; margin-left: 14px; font-size: .85rem; color: var(--accent); text-decoration: none; }
-    .nav:hover { text-decoration: underline; }
-    h1 .exp { white-space: nowrap; font-size: .7rem; vertical-align: middle; margin-left: 8px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--accent); color: var(--accent); font-weight: 400; }
-    .warn { margin: 8px 16px 0; padding: 8px 12px; border-radius: 6px; background: #3a3214; border: 1px solid #6b5a1a; color: #f3d36b; font-size: .82rem; }
-    .tabs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-    .tabs button {
-      background: var(--bg); color: var(--muted); border: 1px solid var(--line);
-      border-radius: 6px; padding: 5px 12px; font-size: .88rem; cursor: pointer;
-    }
-    .tabs button.on { color: var(--text); border-color: var(--accent); background: #3a2a1a; }
-    .tabs .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
-    .tabs button.aside { border-style: dashed; }
-    .note { margin: 8px 16px 0; color: var(--muted); font-size: .8rem; }
-    .score { font-weight: 700; }
-    .cov.low { color: #f3d36b; }
-    .sig { display: inline-block; font-size: .72rem; padding: 1px 6px; margin: 1px 2px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
-    .sig.hot { color: var(--accent); border-color: #6b4a1a; }
-    td.sigs { text-align: left; white-space: normal; min-width: 180px; }
-    tr.detail { cursor: default; background: var(--panel); }
-    tr.detail:hover { background: var(--panel); }
-    tr.detail td { text-align: left; white-space: normal; }
-    .bars { display: grid; grid-template-columns: 5.5em 1fr 4em; gap: 4px 10px; align-items: center; max-width: 460px; font-size: .8rem; }
-    .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
-    .bar > i { display: block; height: 100%; background: var(--accent); }
-    .muted { color: var(--muted); font-size: .78rem; margin-top: 8px; }
-    .muted.warn-text { color: #f3d36b; }
+    :root[data-theme="light"] { --accent: #c25e00; } /* 淺色底上要更深才讀得清楚 */
+    h1 .exp { white-space: nowrap; font-size: .68rem; vertical-align: middle; margin-left: 8px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--tint-line); background: var(--tint); color: var(--accent); font-weight: 500; letter-spacing: 0; }
+    .tabs button.aside { opacity: .8; } /* 暫定、已大幅下跌不是正式階段,視覺上退一階 */
+    .cov.low { color: var(--warn-text); }
+    .sig.hot { color: var(--accent); border-color: var(--tint-line); background: var(--tint); }
+    .muted.warn-text { color: var(--warn-text); }
     @media (max-width: 560px) {
-      td.sigs { white-space: nowrap; min-width: 0; }
-      .tabs button { padding: 4px 9px; }
       .tabs .sep { display: none; }
-      h1 { clear: both; padding-top: 4px; } /* 兩個導覽連結放第一行,標題換到下一行 */
     }
   </style>
+  <link rel="stylesheet" href="ui.css" />
+  <script src="theme.js"></script>
 </head>
 <body>
+  <nav class="topnav">
+    <a href="index.html">法人同步買超</a>
+    <a href="scan.html">吸籌掃描</a>
+    <a href="dist.html" aria-current="page">疑似出貨風險</a>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="切換深色/淺色" title="切換深色/淺色">
+      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+  </nav>
   <header>
-    <a class="nav" href="scan.html">吸籌掃描 →</a>
-    <a class="nav" href="index.html">← 法人同步買超</a>
     <h1>疑似出貨風險<span class="exp" id="exp" hidden>實驗性</span></h1>
     <p class="sub" id="meta">資料載入中…</p>
   </header>

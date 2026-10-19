@@ -38,7 +38,7 @@ const COLS = [
   { key: 'code', label: '代號', get: (s) => s.code, html: (s) => `<td class="code"><a class="code" href="https://tw.stock.yahoo.com/quote/${esc(s.code)}" target="_blank" rel="noopener">${esc(s.code)}</a></td>` },
   { key: 'name', label: '名稱', get: (s) => s.name, html: (s) => `<td>${esc(s.name)}</td>` },
   { key: 'market', label: '市場', get: (s) => s.market, html: (s) => `<td><span class="tag">${MARKET[s.market] ?? '—'}</span></td>` },
-  { key: 'score', label: '分數', num: true, get: (s) => s.score, html: (s) => `<td class="score">${s.score}</td>` },
+  { key: 'score', label: '分數', num: true, get: (s) => s.score, html: (s) => `<td class="score"><span class="lvl${s.score >= 70 ? ' hi' : s.score >= 55 ? ' mid' : ''}">${s.score}</span></td>` },
   { key: 'coverage', label: '覆蓋率', num: true, get: (s) => s.coverage, html: (s) => `<td class="cov${s.coverage < 0.85 ? ' low' : ''}">${Math.round(s.coverage * 100)}%</td>` },
   { key: 'inst_net_20_pct', label: '法人20日%股本', num: true, html: (s, f) => `<td class="${cls(f.inst_net_20_pct)}">${pp(f.inst_net_20_pct)}</td>` },
   { key: 'inst_sell_days_20', label: '法人賣超天', num: true, html: (s, f) => `<td>${f.inst_sell_days_20 ?? '—'}</td>` },
@@ -104,7 +104,7 @@ async function load() {
 function setupControls() {
   const d = state.data;
   document.getElementById('meta').innerHTML =
-    `資料日期:<strong>${esc(d.scan_date)}</strong>　|　更新時間:${esc(d.updated_at)}　|　借券最新:${esc(d.sbl_latest ?? '—')}　|　評分版本 ${esc(d.config_version)}`;
+    `<span>資料日期 <strong>${esc(d.scan_date)}</strong></span><span>更新時間 ${esc(d.updated_at)}</span><span>借券最新 ${esc(d.sbl_latest ?? '—')}</span><span>評分版本 ${esc(d.config_version)}</span>`;
   document.getElementById('exp').hidden = !d.experimental;
   const warns = warnings(d, state.scan);
   if (!state.scan) warns.push('無法載入吸籌結果(scan.json),無法檢查兩邊的版本是否一致。');
@@ -122,7 +122,7 @@ function renderTabs() {
   let html = '';
   TABS.forEach((t, i) => {
     if (t.aside && !TABS[i - 1].aside) html += '<span class="sep"></span>';
-    html += `<button data-stage="${t.stage}" class="${t.stage === state.stage ? 'on' : ''}${t.aside ? ' aside' : ''}">${t.label} ${state.data.counts[t.stage] ?? 0}</button>`;
+    html += `<button data-stage="${t.stage}" class="${t.stage === state.stage ? 'on' : ''}${t.aside ? ' aside' : ''}">${t.label}<span class="n">${state.data.counts[t.stage] ?? 0}</span></button>`;
   });
   tabs.innerHTML = html;
   tabs.querySelectorAll('button').forEach((b) => {

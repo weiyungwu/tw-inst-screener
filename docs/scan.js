@@ -27,7 +27,7 @@ const COLS = [
   { key: 'code', label: '代號', get: (s) => s.code, html: (s) => `<td class="code"><a class="code" href="https://tw.stock.yahoo.com/quote/${s.code}" target="_blank" rel="noopener">${s.code}</a></td>` },
   { key: 'name', label: '名稱', get: (s) => s.name, html: (s) => `<td>${esc(s.name)}</td>` },
   { key: 'market', label: '市場', get: (s) => s.market, html: (s) => `<td><span class="tag">${s.market === 'TWSE' ? '上市' : '上櫃'}</span></td>` },
-  { key: 'score', label: '分數', num: true, get: (s) => s.score, html: (s) => `<td class="score">${s.score}</td>` },
+  { key: 'score', label: '分數', num: true, get: (s) => s.score, html: (s) => `<td class="score"><span class="lvl${s.score >= 70 ? ' hi' : s.score >= 55 ? ' mid' : ''}">${s.score}</span></td>` },
   { key: 'inst_net_20_pct', label: '法人20日%股本', num: true, html: (s, f) => `<td class="${cls(f.inst_net_20_pct)}">${f.inst_net_20_pct == null ? '—' : `${f.inst_net_20_pct > 0 ? '+' : ''}${num(f.inst_net_20_pct)}%`}</td>` },
   { key: 'inst_buy_days_20', label: '法人買超天', num: true, html: (s, f) => `<td>${f.inst_buy_days_20 ?? '—'}</td>` },
   { key: 'big400_pct', label: '大戶400張%(連增週)', num: true, html: (s, f) => `<td>${num(f.big400_pct)}${f.big400_up_weeks ? ` <span class="pos">(+${f.big400_up_weeks})</span>` : ''}</td>` },
@@ -83,7 +83,7 @@ async function load() {
 function setupControls() {
   const d = state.data;
   document.getElementById('meta').innerHTML =
-    `掃描日:<strong>${d.scan_date}</strong>　|　更新時間:${esc(d.updated_at)}　|　集保最新:${d.tdcc_latest ?? '—'}(累積 ${d.tdcc_weeks} 週)`;
+    `<span>掃描日 <strong>${d.scan_date}</strong></span><span>更新時間 ${esc(d.updated_at)}</span><span>集保最新 ${d.tdcc_latest ?? '—'}(累積 ${d.tdcc_weeks} 週)</span>`;
   document.getElementById('warn').hidden = d.quality !== 'tdcc_warming_up';
 
   const sel = document.getElementById('minScore');
@@ -96,7 +96,7 @@ function setupControls() {
 function renderTabs() {
   const tabs = document.getElementById('tabs');
   tabs.innerHTML = TABS.map((t) =>
-    `<button data-stage="${t.stage}" class="${t.stage === state.stage ? 'on' : ''}">${t.label} ${state.data.counts[t.stage] ?? 0}</button>`).join('');
+    `<button data-stage="${t.stage}" class="${t.stage === state.stage ? 'on' : ''}">${t.label}<span class="n">${state.data.counts[t.stage] ?? 0}</span></button>`).join('');
   tabs.querySelectorAll('button').forEach((b) => {
     b.onclick = () => { state.stage = b.dataset.stage; state.open.clear(); render(); };
   });
