@@ -46,8 +46,18 @@ const COLS = [
   { key: 'drawdown_60', label: '距60日高', num: true, html: (s, f) => `<td class="${cls(f.drawdown_60)}">${pct(f.drawdown_60)}</td>` },
   { key: 'ret_20', label: '20日漲幅', num: true, html: (s, f) => `<td class="${cls(f.ret_20)}">${pct(f.ret_20)}</td>` },
   { key: 'sbl_chg_20_pct', label: '借券20日%股本', num: true, html: (s, f) => `<td>${pp(f.sbl_chg_20_pct)}</td>` },
+  { key: 'lights', label: '四維', num: true, get: (s) => s.lights?.red, html: (s) => `<td class="lights">${lightDots(s.lights)}</td>` },
   { key: 'signals', label: '訊號', html: (s) => `<td class="sigs">${signalTags(s.signals)}</td>` },
 ];
+
+// 四維燈號(同吸籌頁,由 lib/fourd.mjs 算好):紅 = 偏多、綠 = 不成立、灰 = 資料不足。
+// 在出貨頁,紅燈多代表價量仍偏多,是出貨訊號的反證。舊版 dist.json 沒有 lights 時顯示 —
+const LIGHTS = [['chip', '籌碼'], ['volume', '量能'], ['ma', '均線'], ['pattern', '型態']];
+const LIGHT_TEXT = { red: '偏多', green: '不成立' };
+function lightDots(l) {
+  if (!l) return '—';
+  return LIGHTS.map(([k, name]) => `<i class="dot ${l[k] ?? 'na'}" title="${name}:${LIGHT_TEXT[l[k]] ?? '資料不足'}"></i>`).join('') + `<span class="red-n">${l.red}</span>`;
+}
 
 const SIGNALS = {
   inst_steady_sell: '法人持續賣', trust_selling: '投信賣超', big_holder_falling: '大戶連減', holders_rising: '股東增加',

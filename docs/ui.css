@@ -159,6 +159,12 @@ tr.detail td { text-align: left; white-space: normal; padding: 14px 16px; }
 .bar { height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; }
 .bar > i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
 .muted { color: var(--muted); font-size: .78rem; margin-top: 8px; line-height: 1.6; }
+/* 四維燈號(吸籌、出貨頁) */
+td.lights { white-space: nowrap; }
+.dot { display: inline-block; width: 9px; height: 9px; margin: 0 1px; border-radius: 50%; background: var(--line); vertical-align: middle; }
+.dot.red { background: var(--pos); }
+.dot.green { background: var(--neg); }
+.red-n { margin-left: 4px; font-size: .78rem; color: var(--muted); }
 
 footer { padding: 10px 16px; }
 

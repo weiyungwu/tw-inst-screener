@@ -219,7 +219,7 @@ function main() {
     const pending = Object.values(dist.sblStatus).includes('pending');
     const distStocks = results
       .filter((r) => r.distribution && DIST_PUBLISHED.includes(r.distribution.stage))
-      .map((r) => ({ code: r.code, name: r.name, market: r.distribution.market, score: r.distribution.score, coverage: r.distribution.coverage, stage: r.distribution.stage, breakdown: r.distribution.breakdown, signals: r.distribution.signals, features: r.features, close: r.close }))
+      .map((r) => ({ code: r.code, name: r.name, market: r.distribution.market, score: r.distribution.score, coverage: r.distribution.coverage, stage: r.distribution.stage, breakdown: r.distribution.breakdown, signals: r.distribution.signals, features: r.features, close: r.close, lights: r.lights }))
       .sort((a, b) => DIST_PUBLISHED.indexOf(a.stage) - DIST_PUBLISHED.indexOf(b.stage) || b.score - a.score || a.code.localeCompare(b.code));
     writeFileSync(DIST_PATH, JSON.stringify({
       updated_at: updatedAt,

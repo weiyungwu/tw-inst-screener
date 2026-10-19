@@ -123,7 +123,7 @@
 | `market` | 全部 | `TWSE`、`TPEX`（掃描日當天所屬市場） |
 | `limit` | 50 | 最多 200 |
 
-回應：`{ scan_date, updated_at, run_id, quality, sbl_status, config_version, experimental, note, count, stocks: [...] }`。每檔有 `score`、`coverage`、`stage`、`breakdown`、`signals`、`features`、`close`，依階段、分數排序。尚未產生時回 `503 { "error": "dist_not_ready" }`。
+回應：`{ scan_date, updated_at, run_id, quality, sbl_status, config_version, experimental, note, count, stocks: [...] }`。每檔有 `score`、`coverage`、`stage`、`breakdown`、`signals`、`features`、`close`、`lights`，依階段、分數排序。尚未產生時回 `503 { "error": "dist_not_ready" }`。
 
 - **用語**：一律稱「疑似出貨風險訊號」。官方資料只能確認「法人淨賣出」「借券餘額增加」這類事實，不能證明是誰在賣、為什麼賣。
 - **解讀期間（`experimental: true`，依 2026-04～10 回測）**：名單之後 **20 日**平均落後同期個股約 2%；**5 日幾乎沒有差異**；期間內最大上漲幅度和其他個股相同。只能當 20 日左右的風險提示，**不能當放空時點**。
@@ -131,6 +131,7 @@
 - `sbl_status`：`{ "TWSE": "ok" | "pending", "TPEX": … }`。`pending` 代表當天借券還沒公布（18:00、20:00 那兩次一定是），該市場個股的 `signals` 帶 `sbl_pending`、信用與借券分數未計入。`quality` 為 `"sbl_pending"` 或 `"sbl_warming_up"` 時要提醒。
 - `breakdown`：`inst` 法人調節（滿分 30）、`dispersion` 籌碼分散（25）、`price` 高檔轉弱（20）、`volume` 量能異常（10）、`credit` 信用與借券（15）。籌碼分散組因集保週數少，門檻尚未經回測驗證。
 - `COLLAPSED` 是價格狀態：已大跌一段，不適用高檔派發判斷，**不代表風險解除**。`PROVISIONAL` 不可當成正式結果。
+- `lights`：四維燈號，定義同 `tw_stock`，不影響出貨分數。在出貨清單中，紅燈多代表價量仍偏多，是出貨訊號的**反證**，不可解讀成買進訊號；舊版 `dist.json` 沒有這個欄位。
 
 ## 工具定義（JSON Schema）
 
