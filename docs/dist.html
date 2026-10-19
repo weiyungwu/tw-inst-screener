@@ -13,6 +13,8 @@
     .tabs button.aside { opacity: .8; } /* 暫定、已大幅下跌不是正式階段,視覺上退一階 */
     .cov.low { color: var(--warn-text); }
     .sig.hot { color: var(--accent); border-color: var(--tint-line); background: var(--tint); }
+    th[data-key="lights"], td.lights { text-align: left; } /* 有「走勢仍強」標籤的列,燈號才會和其他列對齊 */
+    .sig.strong { margin-left: 6px; color: var(--pos); border-color: color-mix(in srgb, var(--pos) 45%, transparent); background: color-mix(in srgb, var(--pos) 12%, transparent); }
     .muted.warn-text { color: var(--warn-text); }
     @media (max-width: 560px) {
       .tabs .sep { display: none; }
@@ -67,7 +69,7 @@
     <summary>說明與資料來源</summary>
     <p>這裡列的是<strong>疑似出貨風險訊號</strong>:法人淨賣出、大戶比例下降、股價從高點回落、帶量長黑、借券賣出餘額增加等現象同時出現。官方資料只能確認這些事實,<strong>不能證明是誰在賣、為什麼賣</strong>,也不代表主力正在出貨。</p>
     <p>評分(0~100):法人調節 30、籌碼分散 25、高檔轉弱 20、量能異常 10、信用與借券 15。<strong>疑似出貨</strong> ≥ 70 分、<strong>注意</strong> 55~69 分,而且資料覆蓋率要 ≥ 85%。覆蓋率不足時列為<strong>暫定</strong>;20 日跌幅超過 25% 或距 60 日高點跌超過 30% 的列為<strong>已大幅下跌</strong>。只評 20 日平均成交值 ≥ 2,000 萬元的個股。點列可看各群組得分與借券資訊。</p>
-    <p><strong>四維燈號</strong>(和吸籌頁相同,依序:籌碼、量能、均線、型態;滑鼠移到燈上看名稱):<i class="dot red"></i> 紅 = 偏多、<i class="dot green"></i> 綠 = 不成立、<i class="dot"></i> 灰 = 資料不足;數字為紅燈數。在這一頁,<strong>紅燈多代表價量仍偏多,是出貨訊號的反證</strong>,不是買進訊號;燈號不影響出貨分數。</p>
+    <p><strong>四維燈號</strong>(和吸籌頁相同,依序:籌碼、量能、均線、型態;滑鼠移到燈上看名稱):<i class="dot red"></i> 紅 = 偏多、<i class="dot green"></i> 綠 = 不成立、<i class="dot"></i> 灰 = 資料不足;數字為紅燈數。在這一頁,<strong>紅燈越多,代表籌碼或價量還偏多、走勢還撐得住,這檔的出貨訊號越可能不準</strong>;3 顆以上會標「走勢仍強」。燈號不是買進訊號,也不影響出貨分數。</p>
     <p><strong>怎麼看(實驗性,依 2026-04 ~ 10 的回測)</strong>:名單個股之後 20 日平均落後同期個股約 2%,5 日則幾乎沒有差異;而且期間內的最大上漲幅度和其他個股差不多。所以這份清單<strong>只適合當作 20 日左右的風險提示</strong>,不適合拿來抓短線放空時點。回測樣本很短,結論可能改變。</p>
     <p class="disc">資料來源:臺灣證券交易所、證券櫃檯買賣中心、臺灣集中保管結算所。借券賣出含鉅額交易與券商避險,單日大量不一定代表看空。本系統只是籌碼與價量的統計篩選工具,<strong>不構成投資建議,亦非放空建議</strong>。</p>
     </details>
