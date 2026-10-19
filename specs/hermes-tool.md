@@ -77,8 +77,9 @@
 
 回應包含 `score`、`stage`、`breakdown`、`signals`、`features`、`close`、`levels`、`lights`、`series`。只要是有資料的普通股都查得到，包含 `NEUTRAL`、`EXCLUDED`。
 
-- `levels`（程式算好的價位，給分析報告用，不參與評分）：`close`、`prev_close`、`ma5`、`ma10`、`ma20`、`ma60`、`high_20`、`low_20`、`high_60`、`low_60`、`high_19_prev`、`high_59_prev`（元）；`volume`、`vol_ma5`、`vol_ma5_prev`、`vol_ma20`（**股**）。`*_prev` 是不含當天的窗口（前 5 日均量、前 19／59 日最高）。
+- `levels`（程式算好的價位，給分析報告用，不參與評分）：`close`、`prev_close`、`ma5`、`ma10`、`ma20`、`ma60`、`high_20`、`low_20`、`high_60`、`low_60`、`high_19_prev`、`high_59_prev`、`low_19_prev`（元）；`volume`、`vol_ma5`、`vol_ma5_prev`、`vol_ma20`（**股**）。`*_prev` 是不含當天的窗口（前 5 日均量、前 19／59 日最高、前 19 日最低）。
 - `lights`（四維燈號，程式依 `stock-4d-3d-trade-report` §5 算好）：`chip` 籌碼、`volume` 量能、`ma` 均線、`pattern` 型態，各為 `"red"`（偏多）、`"green"`（不成立）或 `null`（資料不足，不可當成綠燈）；`red` 紅燈數、`valid` 有效燈數（扣除 `null`）。
+- `bear_lights`（四維偏空燈號，出貨頁用，只顯示、不計入任何分數）：`chip`、`volume`、`ma`、`pattern` 各為 `true`（已轉弱）、`false`（還沒轉弱）或 `null`（資料不足，不可當成 `false`）；`bear` 轉弱燈數、`valid` 有效燈數。規則：籌碼＝20 日法人淨賣超 ≥ 股本 0.2%、20 天內賣超 ≥ 10 天、近 5 日合計 < 0；量能＝當天量 ≥ 前 5 日均量 × 1.5 且收黑，或 20 日內帶量長黑 ≥ 1 天；均線＝收盤 < MA20 且 MA5 < MA20；型態＝收盤 < 前 19 日最低，或疑似假突破（前 10 日最高 R，近 10 日曾收盤 > R，最新收盤 < R）。實作在 `lib/fourd.mjs` 的 `fourDBear`。
 - `distribution`（出貨評分，欄位同 `tw_dist` 每檔的 `score`、`coverage`、`stage`、`breakdown`、`signals`，另帶自己的 `scan_date`、`run_id`、`config_version`、`market`）。**`null` 代表沒有出貨資料（舊版資料、不在當日股票池、出貨評分失敗），不代表沒有出貨風險。**
 - `series`（近 20 個交易日，由舊到新）：`date`、`open`、`high`、`low`、`close`（元）、`volume`（股）、`inst_net`（外資＋投信）、`foreign_net`、`trust_net`、`dealer_net`（**股**）、`margin_balance`（融資餘額，**張**）。
 
@@ -123,7 +124,7 @@
 | `market` | 全部 | `TWSE`、`TPEX`（掃描日當天所屬市場） |
 | `limit` | 50 | 最多 200 |
 
-回應：`{ scan_date, updated_at, run_id, quality, sbl_status, config_version, experimental, note, count, stocks: [...] }`。每檔有 `score`、`coverage`、`stage`、`breakdown`、`signals`、`features`、`close`、`lights`，依階段、分數排序。尚未產生時回 `503 { "error": "dist_not_ready" }`。
+回應：`{ scan_date, updated_at, run_id, quality, sbl_status, config_version, experimental, note, count, stocks: [...] }`。每檔有 `score`、`coverage`、`stage`、`breakdown`、`signals`、`features`、`close`、`lights`、`bear_lights`，依階段、分數排序。尚未產生時回 `503 { "error": "dist_not_ready" }`。
 
 - **用語**：一律稱「疑似出貨風險訊號」。官方資料只能確認「法人淨賣出」「借券餘額增加」這類事實，不能證明是誰在賣、為什麼賣。
 - **解讀期間（`experimental: true`，依 2026-04～10 回測）**：名單之後 **20 日**平均落後同期個股約 2%；**5 日幾乎沒有差異**；期間內最大上漲幅度和其他個股相同。只能當 20 日左右的風險提示，**不能當放空時點**。
@@ -131,7 +132,9 @@
 - `sbl_status`：`{ "TWSE": "ok" | "pending", "TPEX": … }`。`pending` 代表當天借券還沒公布（18:00、20:00 那兩次一定是），該市場個股的 `signals` 帶 `sbl_pending`、信用與借券分數未計入。`quality` 為 `"sbl_pending"` 或 `"sbl_warming_up"` 時要提醒。
 - `breakdown`：`inst` 法人調節（滿分 30）、`dispersion` 籌碼分散（25）、`price` 高檔轉弱（20）、`volume` 量能異常（10）、`credit` 信用與借券（15）。籌碼分散組因集保週數少，門檻尚未經回測驗證。
 - `COLLAPSED` 是價格狀態：已大跌一段，不適用高檔派發判斷，**不代表風險解除**。`PROVISIONAL` 不可當成正式結果。
-- `lights`：四維燈號，定義同 `tw_stock`，不影響出貨分數。在出貨清單中，紅燈多代表價量仍偏多，是出貨訊號的**反證**，不可解讀成買進訊號；舊版 `dist.json` 沒有這個欄位。
+- `bear_lights`：四維偏空燈號，定義同 `tw_stock`，出貨頁顯示的是這組。轉弱燈多代表轉弱的地方多，和出貨訊號互相印證，但**不能證明是誰在賣**；`false` 只代表該項還沒轉弱。
+- `lights`：四維偏多燈號，定義同 `tw_stock`。在出貨清單中，紅燈 ≥ 3 代表價量仍偏多，出貨訊號可能不準（頁面標「走勢仍強」），不可解讀成買進訊號。
+- 兩組燈號都不影響出貨分數；舊版 `dist.json` 沒有這兩個欄位。
 
 ## 工具定義（JSON Schema）
 

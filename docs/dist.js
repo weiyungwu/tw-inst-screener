@@ -46,17 +46,22 @@ const COLS = [
   { key: 'drawdown_60', label: '距60日高', num: true, html: (s, f) => `<td class="${cls(f.drawdown_60)}">${pct(f.drawdown_60)}</td>` },
   { key: 'ret_20', label: '20日漲幅', num: true, html: (s, f) => `<td class="${cls(f.ret_20)}">${pct(f.ret_20)}</td>` },
   { key: 'sbl_chg_20_pct', label: '借券20日%股本', num: true, html: (s, f) => `<td>${pp(f.sbl_chg_20_pct)}</td>` },
-  { key: 'lights', label: '四維偏多', title: '籌碼、量能、均線、型態四項裡,有幾項還偏多。紅燈越多,代表走勢還撐得住,這檔的出貨訊號越可能不準', num: true, get: (s) => s.lights?.red, html: (s) => `<td class="lights">${lightDots(s.lights)}${strongTag(s.lights)}</td>` },
+  { key: 'bear_lights', label: '四維偏空', title: '籌碼、量能、均線、型態四項裡,有幾項已經轉弱。綠燈越多,轉弱的地方越多', num: true, get: (s) => s.bear_lights?.bear, html: (s) => `<td class="lights">${bearDots(s.bear_lights)}${strongTag(s.lights)}</td>` },
   { key: 'signals', label: '訊號', html: (s) => `<td class="sigs">${signalTags(s.signals)}</td>` },
 ];
 
-// 四維燈號(同吸籌頁,由 lib/fourd.mjs 算好):紅 = 偏多、綠 = 不成立、灰 = 資料不足。
-// 在出貨頁,紅燈多代表走勢還撐得住、出貨訊號可能不準。舊版 dist.json 沒有 lights 時顯示 —
+// 四維偏空燈號(lib/fourd.mjs 的 fourDBear):綠 = 已轉弱(台股綠跌)、空心 = 還沒轉弱、灰 = 資料不足。
+// 只顯示、不計入出貨分數。舊版 dist.json 沒有 bear_lights 時顯示 —
 const LIGHTS = [['chip', '籌碼'], ['volume', '量能'], ['ma', '均線'], ['pattern', '型態']];
-const LIGHT_TEXT = { red: '偏多', green: '不成立' };
-function lightDots(l) {
-  if (!l) return '—';
-  return LIGHTS.map(([k, name]) => `<i class="dot ${l[k] ?? 'na'}" title="${name}:${LIGHT_TEXT[l[k]] ?? '資料不足'}"></i>`).join('') + `<span class="red-n">${l.red}</span>`;
+const BEAR_TEXT = { true: '已轉弱', false: '還沒轉弱' };
+function bearDots(b) {
+  if (!b) return '—';
+  return LIGHTS.map(([k, name]) => `<i class="dot ${b[k] == null ? 'na' : b[k] ? 'bear' : 'off'}" title="${name}:${BEAR_TEXT[b[k]] ?? '資料不足'}"></i>`).join('') + `<span class="red-n">${b.bear}</span>`;
+}
+// 偏多紅燈(吸籌頁的四維)≥ 3,同吸籌頁「已開始發動」的門檻:走勢還撐得住,提醒這檔的出貨訊號可能不準
+const STRONG_RED = 3;
+function strongTag(l) {
+  return l && l.red >= STRONG_RED ? ` <span class="sig strong" title="四維偏多有 ${l.red} 顆紅燈:價量還偏多,跟出貨訊號的說法相反,這檔的出貨訊號可能不準">走勢仍強</span>` : '';
 }
 // 紅燈 ≥ 3(同吸籌頁「已開始發動」的門檻):走勢和出貨訊號的說法相反,提醒判讀要保守
 const STRONG_RED = 3;

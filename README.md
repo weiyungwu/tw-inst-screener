@@ -90,8 +90,10 @@ node scripts/verify.mjs         # 列印目前符合條件的股票(自我檢查
 - `scan.json` 帶 `config_version`,調整規則時遞增,回測可區分新舊版本。
 
 ### 四維燈號
-吸籌頁與出貨頁的「四維」欄(可依紅燈數排序)顯示籌碼、量能、均線、型態四顆燈,紅燈偏多、綠燈不成立、灰色為資料不足(不當綠燈)。
-在出貨頁,紅燈多代表價量仍偏多,是出貨訊號的**反證**;燈號不影響吸籌或出貨分數。
+吸籌頁的「四維」欄(可依紅燈數排序)顯示籌碼、量能、均線、型態四顆燈,紅燈偏多、綠燈不成立、灰色為資料不足(不當綠燈)。
+出貨頁改用**四維偏空**燈號(`bear_lights`,`lib/fourd.mjs` 的 `fourDBear`):綠燈 = 已轉弱(台股綠跌)、空心 = 還沒轉弱、灰色 = 資料不足,
+條件和偏多燈號左右對稱,均線、型態沿用出貨報告 skill v1.1 的「趨勢偏空」與「疑似假突破」。偏多紅燈 ≥ 3 時另標「走勢仍強」。
+兩組燈號都只顯示,不影響吸籌或出貨分數。
 規則見 [specs/stock-4d-3d-trade-report_v4.md](specs/stock-4d-3d-trade-report_v4.md) §5,實作在 `lib/fourd.mjs`:
 - **籌碼**:20 日法人淨買超 ≥ 股本 0.2%、20 日內買超 ≥ 10 天、近 5 日法人合計 > 0
 - **量能**:帶量上攻(量 ≥ 1.5 × 前 5 日均量且收紅),或量比 1.0~1.8 且非爆量長黑
@@ -172,7 +174,7 @@ npx wrangler dev                         # http://localhost:8787/scan.html、/ap
 - 出貨評分或上傳失敗不影響吸籌:`dist.json` 停在上一版,頁面依 `scan_date` 顯示「出貨結果停在…」。
 
 ### API
-- `GET /dist.json`:今日 `DISTRIBUTION` / `CAUTION` / `PROVISIONAL` / `COLLAPSED` 清單(每檔含四維燈號 `lights`),頂層有 `sbl_status`(各市場借券是否已公布)、`run_id`、`experimental`
+- `GET /dist.json`:今日 `DISTRIBUTION` / `CAUTION` / `PROVISIONAL` / `COLLAPSED` 清單(每檔含四維偏多 `lights` 與四維偏空 `bear_lights`),頂層有 `sbl_status`(各市場借券是否已公布)、`run_id`、`experimental`
 - `GET /api/dist?stage=DISTRIBUTION,CAUTION&min_score=50&min_coverage=0.85&market=TPEX&limit=50`:參數比照 `/api/scan`,另加 `min_coverage`(0~1)
 - `GET /api/stock/2330` 多一個 `distribution` 欄位(分數、覆蓋率、階段、訊號,帶自己的 `scan_date`、`run_id`)。
   **`distribution: null` 代表「沒有出貨資料」,不代表「沒有出貨風險」。**

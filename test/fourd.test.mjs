@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fourD } from '../lib/fourd.mjs';
+import { fourD, fourDBear } from '../lib/fourd.mjs';
 
 // 基準:四顆燈全紅的個股。各測試只改一個條件,確認那顆燈會翻轉,其他燈不受影響
 const base = () => ({
@@ -58,4 +58,60 @@ test('資料不足 → null(⚪),不可當成綠燈,也不計入有效燈數', (
   assert.equal(r.chip, null);
   assert.equal(r.red, 2);
   assert.equal(r.valid, 2);
+});
+
+// ---- 四維偏空燈號(出貨頁):和偏多燈號對稱,true = 偏空成立、false = 未轉弱、null = 資料不足 ----
+
+// 近 20 日 K:前 10 日最高 100;近 10 日沒有收盤站上 100
+const flat = () => Array.from({ length: 20 }, () => ({ high: 100, close: 98 }));
+// 基準:四顆燈全部偏空成立的個股
+const bearBase = () => ({
+  features: { inst_net_20_pct: -0.5, inst_sell_days_20: 12, inst_net_5: -1000, dump_days_20: 1 },
+  levels: { close: 90, prev_close: 92, volume: 1000, vol_ma5_prev: 1000, ma5: 93, ma20: 95, low_19_prev: 91 },
+  series: flat(),
+});
+const runBear = (mut) => { const x = bearBase(); mut?.(x); return fourDBear(x); };
+
+test('偏空:全部條件成立 → 4 顆偏空、有效 4', () => {
+  assert.deepEqual(runBear(), { chip: true, volume: true, ma: true, pattern: true, bear: 4, valid: 4 });
+});
+
+test('偏空籌碼:和偏多籌碼對稱,三條都要成立;只賣一兩天不算法人持續調節', () => {
+  assert.equal(runBear((x) => { x.features.inst_net_20_pct = -0.19; }).chip, false);
+  assert.equal(runBear((x) => { x.features.inst_sell_days_20 = 9; }).chip, false);
+  assert.equal(runBear((x) => { x.features.inst_net_5 = 0; }).chip, false); // 近 5 日已不再賣
+  assert.equal(runBear((x) => { x.features.inst_net_20_pct = -0.2; x.features.inst_sell_days_20 = 10; }).chip, true); // 門檻含等於
+});
+
+test('偏空量能:當天帶量下跌,或 20 日內有帶量長黑;放量收紅不算', () => {
+  assert.equal(runBear((x) => { x.features.dump_days_20 = 0; x.levels.volume = 1500; }).volume, true); // 1.5 倍量收黑
+  assert.equal(runBear((x) => { x.features.dump_days_20 = 0; x.levels.volume = 1500; x.levels.close = 93; }).volume, false); // 放量但收紅
+  assert.equal(runBear((x) => { x.features.dump_days_20 = 0; }).volume, false); // 沒放量、也沒有長黑
+  // 帶量長黑資料不足、當天也沒有帶量下跌 → 無法判斷,不可當成未轉弱
+  assert.equal(runBear((x) => { x.features.dump_days_20 = null; }).volume, null);
+});
+
+test('偏空均線:跌破月線且 5 日線在月線下;不要求跌破季線(出貨評分抓的是高檔剛轉弱、通常還在季線上)', () => {
+  assert.equal(runBear((x) => { x.levels.close = 96; }).ma, false); // 還在月線上
+  assert.equal(runBear((x) => { x.levels.ma5 = 96; }).ma, false); // 短均線還沒轉弱
+  assert.equal(runBear((x) => { x.levels.ma60 = 80; }).ma, true); // 季線在下方也照樣成立
+});
+
+test('偏空型態:跌破前 19 日低點,或疑似假突破(收盤站上前高後又跌回)', () => {
+  // 沒跌破前低、也沒有假突破
+  assert.equal(runBear((x) => { x.levels.low_19_prev = 89; }).pattern, false);
+  // 沒跌破前低,但近 10 日曾收盤 101 > 前 10 日最高 100,最新收盤 98 又跌回 → 疑似假突破
+  assert.equal(runBear((x) => { x.levels.low_19_prev = 89; x.series[15].close = 101; }).pattern, true);
+  // 站上前高後還守在前高之上 → 不是假突破
+  assert.equal(runBear((x) => { x.levels.low_19_prev = 89; x.series[15].close = 101; x.series[19].close = 100.5; }).pattern, false);
+  // 日 K 不足 20 筆、也沒跌破前低 → 無法判斷假突破,整顆燈為 null
+  assert.equal(runBear((x) => { x.levels.low_19_prev = 89; x.series = flat().slice(0, 19); }).pattern, null);
+});
+
+test('偏空:資料不足 → null,不計入有效燈數,也不可當成未轉弱', () => {
+  const r = runBear((x) => { x.features.inst_sell_days_20 = null; x.levels.ma20 = null; });
+  assert.equal(r.chip, null);
+  assert.equal(r.ma, null);
+  assert.equal(r.valid, 2);
+  assert.equal(r.bear, 2);
 });

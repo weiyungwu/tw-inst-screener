@@ -29,7 +29,8 @@ DB_PATH=/tmp/copy.sqlite node scripts/score.mjs   # 驗證評分輸出；用資�
 - **單位最容易出錯**：法人淨買超在 `series` 是**股**、在首頁與 `/api/cobuy` 是**張**；比例類特徵多為小數（0.05 = 5%），`*_pct` 是 % 股本。完整對照見 `specs/hermes-tool.md`。
 - `null` 代表資料不足，**不可當成 0**；缺資料的評分項目給 0 分並列入 `missing:*`，0 分不代表沒有風險。
 - 改評分門檻要遞增 `CONFIG.version`（吸籌 `lib/score.mjs`、出貨 `lib/distribution.mjs`），回測靠它區分新舊版本。
-- 四維燈號規則同時寫在 `lib/fourd.mjs` 與 `specs/stock-4d-3d-trade-report_v4.md` §5，**改一邊就要改另一邊**。
+- 四維偏多燈號規則同時寫在 `lib/fourd.mjs` 與 `specs/stock-4d-3d-trade-report_v4.md` §5，**改一邊就要改另一邊**。
+- 四維偏空燈號（`fourDBear`，出貨頁）的均線、型態沿用 `specs/stock-dist-risk-report_v1.md` §5 結構檢查；規則也寫在 `specs/hermes-tool.md` 與 `docs/dist.html` 頁尾，改規則時這幾處要一起改。兩組燈號都**只顯示、不計分**。
 - 出貨評分失敗**不可影響吸籌**：吸籌照常輸出，`dist.json` 保留上一版。
 - 改 API 回應欄位時，同步更新 `specs/hermes-tool.md` 與 `specs/台股籌碼資料_Skill_v1.2.md`。
 
