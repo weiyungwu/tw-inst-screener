@@ -63,11 +63,6 @@ const STRONG_RED = 3;
 function strongTag(l) {
   return l && l.red >= STRONG_RED ? ` <span class="sig strong" title="四維偏多有 ${l.red} 顆紅燈:價量還偏多,跟出貨訊號的說法相反,這檔的出貨訊號可能不準">走勢仍強</span>` : '';
 }
-// 紅燈 ≥ 3(同吸籌頁「已開始發動」的門檻):走勢和出貨訊號的說法相反,提醒判讀要保守
-const STRONG_RED = 3;
-function strongTag(l) {
-  return l && l.red >= STRONG_RED ? ` <span class="sig strong" title="四維有 ${l.red} 顆紅燈:價量還偏多,跟出貨訊號的說法相反,這檔的出貨訊號可能不準">走勢仍強</span>` : '';
-}
 
 const SIGNALS = {
   inst_steady_sell: '法人持續賣', trust_selling: '投信賣超', big_holder_falling: '大戶連減', holders_rising: '股東增加',

@@ -251,7 +251,7 @@ async function call(name, args) {
   → `tw_scan({ limit: 10 })`
 - 「法人同步買超和吸籌清單有哪些重疊？逐檔分析。」
   → `tw_cobuy({})` ＋ `tw_scan({ stage: ["ACCUMULATION","WATCH"], limit: 200 })` 取交集，再對每檔 `tw_stock`
-- 要產出完整的分析報告時，建議改用 Hermes skill `specs/台股籌碼資料_Skill_v1.2.md` 抓資料，再交給 `stock-4d-3d-trade-report`（規格見 `specs/stock-4d-3d-trade-report_v4.md`）產生報告。
+- 要產出完整的分析報告時，建議改用 Hermes skill `specs/台股籌碼資料_Skill_v1.3.md` 抓資料，再交給 `stock-4d-3d-trade-report`（規格見 `specs/stock-4d-3d-trade-report_v4.md`）產生報告。
 - 「今天疑似出貨風險分數最高的上櫃股？借券資料算進去了嗎？」
   → `tw_dist({ stage: ["DISTRIBUTION","CAUTION"], market: "TPEX", limit: 10 })`，並看回應的 `sbl_status`
 - 「我的持股 2330 有沒有出貨風險訊號？」

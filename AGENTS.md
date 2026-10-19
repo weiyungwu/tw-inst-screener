@@ -32,7 +32,7 @@ DB_PATH=/tmp/copy.sqlite node scripts/score.mjs   # 驗證評分輸出；用資�
 - 四維偏多燈號規則同時寫在 `lib/fourd.mjs` 與 `specs/stock-4d-3d-trade-report_v4.md` §5，**改一邊就要改另一邊**。
 - 四維偏空燈號（`fourDBear`，出貨頁）的均線、型態沿用 `specs/stock-dist-risk-report_v1.md` §5 結構檢查；規則也寫在 `specs/hermes-tool.md` 與 `docs/dist.html` 頁尾，改規則時這幾處要一起改。兩組燈號都**只顯示、不計分**。
 - 出貨評分失敗**不可影響吸籌**：吸籌照常輸出，`dist.json` 保留上一版。
-- 改 API 回應欄位時，同步更新 `specs/hermes-tool.md` 與 `specs/台股籌碼資料_Skill_v1.2.md`。
+- 改 API 回應欄位時，同步更新 `specs/hermes-tool.md` 與 `specs/台股籌碼資料_Skill_v1.3.md`。
 
 ## 用語（網頁、API、skill 都適用）
 - 出貨相關一律稱「**疑似出貨風險訊號**」，不寫「主力正在出貨」；借券不等於放空，法人賣超不等於主力做空。
