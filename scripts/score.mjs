@@ -17,7 +17,7 @@ import { nowTaipei } from '../lib/dates.mjs';
 import { openDb, tx, upsertStmt, logIngest } from '../lib/db.mjs';
 import { computeFeatures, priceLevels } from '../lib/features.mjs';
 import { scoreStock, CONFIG } from '../lib/score.mjs';
-import { fourD } from '../lib/fourd.mjs';
+import { fourD, fourDBear } from '../lib/fourd.mjs';
 import { scoreDistribution, pointInTimeUniverse, CONFIG as DIST_CONFIG } from '../lib/distribution.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -152,7 +152,8 @@ function main() {
     });
     const levels = priceLevels({ days, price: p });
     const lights = fourD({ features, levels }); // 用未四捨五入的值判斷,避免進位改變燈號
-    results.push({ ...s, ...scored, features: roundAll(features), close: p.get(t)?.close ?? null, levels: roundAll(levels), lights, series, distribution });
+    const bear_lights = fourDBear({ features, levels, series }); // 出貨頁用,只顯示、不計分
+    results.push({ ...s, ...scored, features: roundAll(features), close: p.get(t)?.close ?? null, levels: roundAll(levels), lights, bear_lights, series, distribution });
   }
   // 股票池內但不在 stocks 的代號(從沒有法人交易紀錄、成交極少的個股):只寫 dist_daily,不進分片與 dist.json
   const extra = dist ? [...dist.universe.keys()].filter((code) => !dist.byCode.has(code)) : [];
@@ -207,7 +208,7 @@ function main() {
   const published = results
     .filter((r) => PUBLISHED.includes(r.stage))
     .sort((a, b) => PUBLISHED.indexOf(a.stage) - PUBLISHED.indexOf(b.stage) || b.score - a.score || a.code.localeCompare(b.code))
-    .map(({ series, levels, distribution, ...r }) => r); // scan.json 只放清單需要的欄位;明細(含出貨評分)在 features 分片
+    .map(({ series, levels, distribution, bear_lights, ...r }) => r); // scan.json 只放清單需要的欄位;明細(含出貨評分、偏空燈號)在 features 分片
   mkdirSync(dirname(SCAN_PATH), { recursive: true });
   writeFileSync(SCAN_PATH, JSON.stringify({ ...meta, counts, stocks: published, note: '僅供研究參考，非投資建議。' }));
 
@@ -219,7 +220,7 @@ function main() {
     const pending = Object.values(dist.sblStatus).includes('pending');
     const distStocks = results
       .filter((r) => r.distribution && DIST_PUBLISHED.includes(r.distribution.stage))
-      .map((r) => ({ code: r.code, name: r.name, market: r.distribution.market, score: r.distribution.score, coverage: r.distribution.coverage, stage: r.distribution.stage, breakdown: r.distribution.breakdown, signals: r.distribution.signals, features: r.features, close: r.close, lights: r.lights }))
+      .map((r) => ({ code: r.code, name: r.name, market: r.distribution.market, score: r.distribution.score, coverage: r.distribution.coverage, stage: r.distribution.stage, breakdown: r.distribution.breakdown, signals: r.distribution.signals, features: r.features, close: r.close, lights: r.lights, bear_lights: r.bear_lights }))
       .sort((a, b) => DIST_PUBLISHED.indexOf(a.stage) - DIST_PUBLISHED.indexOf(b.stage) || b.score - a.score || a.code.localeCompare(b.code));
     writeFileSync(DIST_PATH, JSON.stringify({
       updated_at: updatedAt,
