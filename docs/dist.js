@@ -46,17 +46,22 @@ const COLS = [
   { key: 'drawdown_60', label: '距60日高', num: true, html: (s, f) => `<td class="${cls(f.drawdown_60)}">${pct(f.drawdown_60)}</td>` },
   { key: 'ret_20', label: '20日漲幅', num: true, html: (s, f) => `<td class="${cls(f.ret_20)}">${pct(f.ret_20)}</td>` },
   { key: 'sbl_chg_20_pct', label: '借券20日%股本', num: true, html: (s, f) => `<td>${pp(f.sbl_chg_20_pct)}</td>` },
-  { key: 'lights', label: '四維', num: true, get: (s) => s.lights?.red, html: (s) => `<td class="lights">${lightDots(s.lights)}</td>` },
+  { key: 'lights', label: '四維偏多', title: '籌碼、量能、均線、型態四項裡,有幾項還偏多。紅燈越多,代表走勢還撐得住,這檔的出貨訊號越可能不準', num: true, get: (s) => s.lights?.red, html: (s) => `<td class="lights">${lightDots(s.lights)}${strongTag(s.lights)}</td>` },
   { key: 'signals', label: '訊號', html: (s) => `<td class="sigs">${signalTags(s.signals)}</td>` },
 ];
 
 // 四維燈號(同吸籌頁,由 lib/fourd.mjs 算好):紅 = 偏多、綠 = 不成立、灰 = 資料不足。
-// 在出貨頁,紅燈多代表價量仍偏多,是出貨訊號的反證。舊版 dist.json 沒有 lights 時顯示 —
+// 在出貨頁,紅燈多代表走勢還撐得住、出貨訊號可能不準。舊版 dist.json 沒有 lights 時顯示 —
 const LIGHTS = [['chip', '籌碼'], ['volume', '量能'], ['ma', '均線'], ['pattern', '型態']];
 const LIGHT_TEXT = { red: '偏多', green: '不成立' };
 function lightDots(l) {
   if (!l) return '—';
   return LIGHTS.map(([k, name]) => `<i class="dot ${l[k] ?? 'na'}" title="${name}:${LIGHT_TEXT[l[k]] ?? '資料不足'}"></i>`).join('') + `<span class="red-n">${l.red}</span>`;
+}
+// 紅燈 ≥ 3(同吸籌頁「已開始發動」的門檻):走勢和出貨訊號的說法相反,提醒判讀要保守
+const STRONG_RED = 3;
+function strongTag(l) {
+  return l && l.red >= STRONG_RED ? ` <span class="sig strong" title="四維有 ${l.red} 顆紅燈:價量還偏多,跟出貨訊號的說法相反,這檔的出貨訊號可能不準">走勢仍強</span>` : '';
 }
 
 const SIGNALS = {
@@ -196,7 +201,7 @@ function render() {
   const head = document.getElementById('headRow');
   head.innerHTML = COLS.map((c) => {
     const arrow = c.key === sortKey ? `<span class="arrow">${sortDir < 0 ? '▼' : '▲'}</span>` : '';
-    return `<th data-key="${c.key}">${c.label} ${arrow}</th>`;
+    return `<th data-key="${c.key}"${c.title ? ` title="${c.title}"` : ''}>${c.label} ${arrow}</th>`;
   }).join('');
   head.querySelectorAll('th').forEach((th) => {
     const k = th.dataset.key;
