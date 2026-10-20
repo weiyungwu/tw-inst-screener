@@ -21,6 +21,9 @@
 node --test test/*.test.mjs        # 單元測試（直接寫 `node --test test/` 會把目錄當成單一檔案而失敗）
 node scripts/serve.mjs             # http://localhost:8080 預覽 docs/
 DB_PATH=/tmp/copy.sqlite node scripts/score.mjs   # 驗證評分輸出；用資料庫複本，不要直接寫 data/history.sqlite
+node scripts/regress.mjs snapshot  # 改動前先存吸籌輸出的基準（會凍結一份 DB 到 data/regress/）
+node scripts/regress.mjs compare   # 改動後比對；忽略新增的出貨鍵與 updated_at，其餘要完全相同（兩個指令都會覆寫 docs/*.json 與 data/features/，結束後重跑 score.mjs 還原）
+node scripts/verify-scan.mjs --stats   # 各表日期數、缺漏與最近的 ingest 錯誤
 ```
 - 需要 Node ≥ 22.13（內建 `node:sqlite`）。runtime **零 npm 依賴**，不要加套件。
 - `docs/data.json`、`scan.json`、`dist.json` 與 `data/` 都不進 git。預覽畫面時可以從正式站 <https://tw-stocks.happytoo.cc> 下載 JSON 放進 `docs/`。
@@ -32,6 +35,15 @@ DB_PATH=/tmp/copy.sqlite node scripts/score.mjs   # 驗證評分輸出；用資�
 - 四維偏多燈號規則同時寫在 `lib/fourd.mjs` 與 `specs/stock-4d-3d-trade-report_v4.md` §5，**改一邊就要改另一邊**。
 - 四維偏空燈號（`fourDBear`，出貨頁）的均線、型態沿用 `specs/stock-dist-risk-report_v1.md` §5 結構檢查；規則也寫在 `specs/hermes-tool.md` 與 `docs/dist.html` 頁尾，改規則時這幾處要一起改。兩組燈號都**只顯示、不計分**。
 - 出貨評分失敗**不可影響吸籌**：吸籌照常輸出，`dist.json` 保留上一版。
+- **吸籌輸出只能新增鍵**：`lib/score.mjs` 的 `CONFIG`、`scoreStock()` 與 `scan_daily` 欄位不動；`features` 只新增、不改既有定義。動到 `lib/features.mjs`、`scripts/score.mjs` 或 `worker/index.js` 時，改動前後跑 `regress.mjs` 比對。
+- **借券資料逐列勾稽**（前日 + 賣出 − 還券 + 調整 = 當日），任一列不符整個市場當天不寫入。遇到新的不符先回報使用者，不要放寬；目前唯一的例外是「停止買賣當天餘額歸零」（見 `specs/endpoints.md`）。
+- 借券約 22:30 才公布：18:00、20:00 的出貨結果帶 `sbl_pending`、覆蓋率較低是正常的，22:45 那次會補齊。
+- **workflow 不可從觸發來源帶入日期**（cron 字串、dispatch 的 `inputs`）：每一步都要用執行當下的時間與 DB 決定處理哪天。`concurrency` 取代待執行的那次時不漏資料，靠的就是這個前提。
+
+## 資料庫
+- R2 的 `db/history.sqlite` 是**正本**，workflow 每天下載 → 補資料 → 上傳。本機 `data/history.sqlite` 只是工作副本。
+- **不要把本機 DB 上傳覆蓋 R2**，除非使用者明確要求；上傳前先比對兩邊各表的最新日期，並確認沒有 workflow 正在執行（否則會被它結束時的上傳蓋掉）。
+- 要用最新資料時，從 R2 下載：`npx wrangler r2 object get tw-stocks-data/db/history.sqlite --file data/history.sqlite --remote`。
 - 改 API 回應欄位時，同步更新 `specs/hermes-tool.md` 與 `specs/台股籌碼資料_Skill_v1.3.md`。
 
 ## 用語（網頁、API、skill 都適用）
