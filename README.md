@@ -117,30 +117,36 @@ node scripts/verify.mjs         # 列印目前符合條件的股票(自我檢查
 
 ```bash
 # 本機(建議先 export TZ=Asia/Taipei)
-node scripts/ingest-daily.mjs            # 補近 14 天缺漏的法人、收盤行情、融資、外資持股
+node scripts/ingest-daily.mjs            # 補近 14 天缺漏的法人、收盤行情、融資、外資持股、借券賣出
 node scripts/ingest-weekly.mjs           # 集保最新一週(已有就略過)
-node scripts/score.mjs                   # 產生 docs/scan.json、data/features/*.json、scan_daily
+node scripts/score.mjs                   # 產生 docs/scan.json、docs/dist.json、data/features/*.json,寫入 scan_daily、dist_daily
 node scripts/verify-scan.mjs             # 今日各階段檔數與 ACCUMULATION 前 20 檔
 node scripts/verify-scan.mjs --stats     # 各表日期數、筆數與缺漏
-node --test                              # 單元測試
+node --test test/*.test.mjs              # 單元測試
 ```
 
 ### 首次部署
 workflow 下載不到 `db/history.sqlite` 時會**直接失敗**(不會建空檔覆蓋歷史),所以第一次要先在本機建好再上傳:
 ```bash
-node scripts/backfill.mjs --days 60      # 回補 60 個交易日(約 25~30 分鐘,請求間隔 3 秒)
+node scripts/backfill.mjs --days 60      # 回補 60 個交易日,含借券(每天約 10 個請求、間隔 3 秒,實測約 1 小時以上)
 node scripts/ingest-weekly.mjs           # 集保最新一週
 node scripts/backfill.mjs --tdcc-weeks 4 # 選用:從集保官網回補前 4 週(一檔一週一次請求,約 2,000 檔 × 4 ≈ 7 小時)
 npx wrangler r2 object put tw-stocks-data/db/history.sqlite --file data/history.sqlite --remote
 ```
 回補可以中斷後重跑,已存在的日期與個股會跳過。集保未滿 4 週時,頁面會顯示「籌碼集中分數僅供參考」。
 
+> **上傳之後,R2 的 `db/history.sqlite` 就是正本**:workflow 每天都在更新它,本機的 DB 只是工作副本。
+> 不要再把本機的 DB 上傳覆蓋 R2,否則 R2 上較新的資料會不見。本機需要最新資料時,反過來從 R2 下載:
+> `npx wrangler r2 object get tw-stocks-data/db/history.sqlite --file data/history.sqlite --remote`。
+> 回補要在 R2 啟用前做完;已上線後若要補歷史,先下載 R2 最新版、在本機回補,並確認上傳前沒有 workflow 正在執行。
+
 ### 本機測試 Worker
 ```bash
 node scripts/score.mjs
 npx wrangler r2 object put tw-stocks-data/scan.json --file docs/scan.json --local
+npx wrangler r2 object put tw-stocks-data/dist.json --file docs/dist.json --local
 for f in data/features/*.json; do npx wrangler r2 object put "tw-stocks-data/features/$(basename $f)" --file "$f" --local; done
-npx wrangler dev                         # http://localhost:8787/scan.html、/api/scan、/api/stock/2330
+npx wrangler dev                         # http://localhost:8787/scan.html、/dist.html、/api/scan、/api/dist、/api/stock/2330
 ```
 
 ## 疑似出貨風險訊號(`/dist.html`)
@@ -169,7 +175,8 @@ npx wrangler dev                         # http://localhost:8787/scan.html、/ap
 
 ### 借券賣出與 22:45 排程
 - 新增資料源:TWSE `TWT93U`、TPEX `margin/sbl`(借券賣出餘額,單位股),存 `sbl_daily`;每列都要通過勾稽,任一不符整個市場當天不寫入。
-- 借券約 20:30、22:30 公布,比其他資料晚,所以多一個 **22:45** 排程補當天借券、重算出貨分數(其他來源已存在會跳過)。
+- 借券比其他資料晚公布:實測兩個市場都在 20:30 之後、22:30 之前公布,22:30 之後不再變動(見 [specs/endpoints.md](specs/endpoints.md))。
+  所以多一個 **22:45** 排程補當天借券、重算出貨分數(其他來源已存在會跳過)。
   18:00、20:00 那兩次的出貨結果會帶 `sbl_pending`,覆蓋率下降,頁面會提示「借券資料約 22:45 更新」。
 - 出貨評分或上傳失敗不影響吸籌:`dist.json` 停在上一版,頁面依 `scan_date` 顯示「出貨結果停在…」。
 
