@@ -57,18 +57,20 @@
 
 ## 2. `tw_scan` — 吸籌掃描清單
 
-`GET /api/scan?stage=ACCUMULATION,WATCH&min_score=50&market=TPEX&limit=50`
+`GET /api/scan?stage=ACCUMULATION,WATCH&min_score=50&market=TPEX&sort=lights&limit=50`
 
 | 參數 | 預設 | 說明 |
 |---|---|---|
 | `stage` | `ACCUMULATION` | 逗號分隔：`ACCUMULATION` 吸籌（≥ 70 分）、`WATCH` 觀察（55～69 分）、`OVERHEATED` 過熱（20 日漲幅 > 25% 或量比 > 2.5，不論分數） |
 | `min_score` | 0 | 最低分數 |
 | `market` | 全部 | `TWSE`、`TPEX` |
+| `sort` | `score` | `score`：依階段、分數由高到低；`lights`：四維偏多紅燈數（`lights.red`）多的在前，同燈數分數高的在前（不分階段） |
 | `limit` | 50 | 最多 200 |
 
-回應：`{ scan_date, updated_at, quality, tdcc_weeks, count, total, stocks: [...] }`。每檔有 `score`、`stage`、`breakdown`、`signals`、`features`、`close`、`lights`，依分數由高到低排序。
+回應：`{ scan_date, updated_at, quality, tdcc_weeks, sort, count, total, stocks: [...] }`。每檔有 `score`、`stage`、`breakdown`、`signals`、`features`、`close`、`lights`，依 `sort` 排序（回應的 `sort` 是實際採用的方式）。
 
-- `count` 是這次回傳的檔數，`total` 是符合條件的總檔數。`count < total` 代表分數較低的股票被 `limit` 截掉了（預設只回 50 檔），要完整清單就加大 `limit`（最多 200）；只查單檔改用 `tw_stock`。
+- `sort=lights` 直接用燈數排序，資料不足（`null`）的燈不計入燈數，也不另外處理；`sort` 不是 `score`／`lights` 時回 `400 { "error": "invalid_sort" }`。
+- `count` 是這次回傳的檔數，`total` 是符合條件的總檔數。`count < total` 代表排在後面的股票被 `limit` 截掉了（預設只回 50 檔；排序在截斷之前，所以 `sort=lights` 拿到的是全部符合股票裡燈數最多的），要完整清單就加大 `limit`（最多 200）；只查單檔改用 `tw_stock`。
 
 - `quality` 為 `"tdcc_warming_up"` 時，集保資料不足 4 週，籌碼集中分數僅供參考，回答時要提醒。
 - `breakdown`：`inst` 法人緩買（滿分 30）、`concentration` 籌碼集中（30）、`price` 價格未動（20）、`volume` 量能溫和（10）、`margin` 融資退場（10）。
@@ -116,7 +118,7 @@
 
 ## 4. `tw_dist` — 疑似出貨風險訊號清單
 
-`GET /api/dist?stage=DISTRIBUTION,CAUTION&min_score=50&min_coverage=0.85&market=TPEX&limit=50`
+`GET /api/dist?stage=DISTRIBUTION,CAUTION&min_score=50&min_coverage=0.85&market=TPEX&sort=lights&limit=50`
 
 | 參數 | 預設 | 說明 |
 |---|---|---|
@@ -124,9 +126,10 @@
 | `min_score` | 0 | 最低分數 |
 | `min_coverage` | 0 | 最低覆蓋率（0～1），超出範圍回 400 |
 | `market` | 全部 | `TWSE`、`TPEX`（掃描日當天所屬市場） |
+| `sort` | `score` | `score`：依階段、分數由高到低；`lights`：四維偏空轉弱燈數（`bear_lights.bear`，出貨頁的綠燈數）多的在前，同燈數分數高的在前（不分階段） |
 | `limit` | 50 | 最多 200 |
 
-回應：`{ scan_date, updated_at, run_id, quality, sbl_status, config_version, experimental, note, count, total, stocks: [...] }`。`count`、`total` 的意思同 `tw_scan`。每檔有 `score`、`coverage`、`stage`、`breakdown`、`signals`、`features`、`close`、`lights`、`bear_lights`，依階段、分數排序。尚未產生時回 `503 { "error": "dist_not_ready" }`。
+回應：`{ scan_date, updated_at, run_id, quality, sbl_status, config_version, experimental, note, sort, count, total, stocks: [...] }`。`sort`、`count`、`total` 的意思同 `tw_scan`。每檔有 `score`、`coverage`、`stage`、`breakdown`、`signals`、`features`、`close`、`lights`、`bear_lights`，依 `sort` 排序（預設依階段、分數）。尚未產生時回 `503 { "error": "dist_not_ready" }`。
 
 - **用語**：一律稱「疑似出貨風險訊號」。官方資料只能確認「法人淨賣出」「借券餘額增加」這類事實，不能證明是誰在賣、為什麼賣。
 - **解讀期間（`experimental: true`，依 2026-04～10 回測）**：名單之後 **20 日**平均落後同期個股約 2%；**5 日幾乎沒有差異**；期間內最大上漲幅度和其他個股相同。只能當 20 日左右的風險提示，**不能當放空時點**。
@@ -257,7 +260,7 @@ async function call(name, args) {
   → `tw_scan({ limit: 10 })`
 - 「法人同步買超和吸籌清單有哪些重疊？逐檔分析。」
   → `tw_cobuy({})` ＋ `tw_scan({ stage: ["ACCUMULATION","WATCH"], limit: 200 })` 取交集，再對每檔 `tw_stock`
-- 要產出完整的分析報告時，建議改用 Hermes skill `specs/台股籌碼資料_Skill_v1.5.md` 抓資料，再交給 `stock-4d-3d-trade-report`（規格見 `specs/stock-4d-3d-trade-report_v4.md`）產生報告。
+- 要產出完整的分析報告時，建議改用 Hermes skill `specs/台股籌碼資料_Skill_v1.6.md` 抓資料，再交給 `stock-4d-3d-trade-report`（規格見 `specs/stock-4d-3d-trade-report_v4.md`）產生報告。
 - 「今天疑似出貨風險分數最高的上櫃股？借券資料算進去了嗎？」
   → `tw_dist({ stage: ["DISTRIBUTION","CAUTION"], market: "TPEX", limit: 10 })`，並看回應的 `sbl_status`
 - 「我的持股 2330 有沒有出貨風險訊號？」

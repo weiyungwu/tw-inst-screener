@@ -7,6 +7,7 @@ const WORKFLOW_DISPATCH_URL =
 
 const STAGES = ['ACCUMULATION', 'WATCH', 'OVERHEATED'];
 const DIST_STAGES = ['DISTRIBUTION', 'CAUTION', 'PROVISIONAL', 'COLLAPSED'];
+const SORTS = ['score', 'lights'];
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-headers': 'authorization',
@@ -27,12 +28,20 @@ async function r2Response(env, key) {
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS } });
 
+// sort=lights:燈數多的在前,同燈數分數高的在前,再依代號;直接用燈數排序,資料不足的燈不另外處理。
+// 要在 limit 截斷之前排序,否則只是把前 limit 檔重排
+function byLights(stocks, lightsOf) {
+  const n = (s) => lightsOf(s) ?? -1;
+  return [...stocks].sort((a, b) => n(b) - n(a) || b.score - a.score || a.code.localeCompare(b.code));
+}
+
 async function readJson(env, key) {
   const obj = await env.DATA.get(key);
   return obj ? obj.json() : null;
 }
 
-// GET /api/scan?stage=ACCUMULATION,WATCH&min_score=50&market=TPEX&limit=50
+// GET /api/scan?stage=ACCUMULATION,WATCH&min_score=50&market=TPEX&sort=lights&limit=50
+// sort:score(預設,依階段、分數)或 lights(四維偏多紅燈數 lights.red,再比分數)
 async function apiScan(env, params) {
   const scan = await readJson(env, 'scan.json');
   if (!scan) return json({ error: 'scan_not_ready' }, 503);
@@ -43,17 +52,21 @@ async function apiScan(env, params) {
   const market = params.get('market')?.toUpperCase();
   if (market && market !== 'TWSE' && market !== 'TPEX') return json({ error: 'invalid_market', allowed: ['TWSE', 'TPEX'] }, 400);
   const minScore = Number(params.get('min_score') ?? 0);
+  const sort = (params.get('sort') ?? 'score').toLowerCase();
+  if (!SORTS.includes(sort)) return json({ error: 'invalid_sort', allowed: SORTS }, 400);
   const limit = Math.min(Math.max(Number(params.get('limit') ?? 50) || 50, 1), 200);
 
   // count 是回傳檔數、total 是符合條件的總檔數(count < total 代表被 limit 截斷)
-  const matched = scan.stocks
+  let matched = scan.stocks
     .filter((s) => stages.includes(s.stage) && s.score >= minScore && (!market || s.market === market));
+  if (sort === 'lights') matched = byLights(matched, (s) => s.lights?.red);
   const stocks = matched.slice(0, limit);
-  return json({ scan_date: scan.scan_date, updated_at: scan.updated_at, quality: scan.quality, tdcc_weeks: scan.tdcc_weeks, count: stocks.length, total: matched.length, stocks });
+  return json({ scan_date: scan.scan_date, updated_at: scan.updated_at, quality: scan.quality, tdcc_weeks: scan.tdcc_weeks, sort, count: stocks.length, total: matched.length, stocks });
 }
 
-// GET /api/dist?stage=DISTRIBUTION,CAUTION&min_score=50&min_coverage=0.85&market=TPEX&limit=50
+// GET /api/dist?stage=DISTRIBUTION,CAUTION&min_score=50&min_coverage=0.85&market=TPEX&sort=lights&limit=50
 // 疑似出貨風險訊號(dist.json);參數比照 /api/scan,另加 min_coverage(0~1)。market 是 market(t)(規格 §7.6)
+// sort=lights 用四維偏空轉弱燈數 bear_lights.bear(出貨頁的綠燈數)
 async function apiDist(env, params) {
   const dist = await readJson(env, 'dist.json');
   if (!dist) return json({ error: 'dist_not_ready' }, 503);
@@ -66,14 +79,17 @@ async function apiDist(env, params) {
   const minScore = Number(params.get('min_score') ?? 0);
   const minCoverage = Number(params.get('min_coverage') ?? 0);
   if (!(minCoverage >= 0 && minCoverage <= 1)) return json({ error: 'invalid_min_coverage', hint: 'min_coverage 必須介於 0 和 1 之間' }, 400);
+  const sort = (params.get('sort') ?? 'score').toLowerCase();
+  if (!SORTS.includes(sort)) return json({ error: 'invalid_sort', allowed: SORTS }, 400);
   const limit = Math.min(Math.max(Number(params.get('limit') ?? 50) || 50, 1), 200);
 
-  const matched = dist.stocks
+  let matched = dist.stocks
     .filter((s) => stages.includes(s.stage) && s.score >= minScore && s.coverage >= minCoverage && (!market || s.market === market));
+  if (sort === 'lights') matched = byLights(matched, (s) => s.bear_lights?.bear);
   const stocks = matched.slice(0, limit);
   return json({
     scan_date: dist.scan_date, updated_at: dist.updated_at, run_id: dist.run_id, quality: dist.quality, sbl_status: dist.sbl_status,
-    config_version: dist.config_version, experimental: dist.experimental ?? null, note: dist.note, count: stocks.length, total: matched.length, stocks,
+    config_version: dist.config_version, experimental: dist.experimental ?? null, note: dist.note, sort, count: stocks.length, total: matched.length, stocks,
   });
 }
 
