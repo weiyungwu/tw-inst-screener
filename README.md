@@ -111,7 +111,7 @@ node scripts/verify.mjs         # 列印目前符合條件的股票(自我檢查
   - `GET /api/stock/2330`:單檔完整特徵、分數、四維燈號、均線與價位(`levels`)及近 20 日序列(依代號前兩碼讀 `features/23.json`)
   - `GET /api/cobuy?days=10&streak=5&insts=foreign,trust&market=TPEX&sort=foreign&limit=50`:法人同步買超,篩選規則與首頁相同(單位張)
   - Hermes Agent 等 agent 的工具定義與系統提示見 [specs/hermes-tool.md](specs/hermes-tool.md);
-    抓資料用的 skill 見 [specs/台股籌碼資料_Skill_v1.5.md](specs/台股籌碼資料_Skill_v1.5.md);
+    抓資料用的 skill 見 [specs/台股籌碼資料_Skill_v1.6.md](specs/台股籌碼資料_Skill_v1.6.md);
     報告 skill:偏多交易劇本 [specs/stock-4d-3d-trade-report_v4.md](specs/stock-4d-3d-trade-report_v4.md)、疑似出貨風險與持股防守 v1.2 [specs/stock-dist-risk-report_v1.md](specs/stock-dist-risk-report_v1.md)(含四維偏空燈號、結構檢查、假突破/假跌破、推翻條件)
   - Hermes 透過 Telegram 安裝的是 skill 檔的**複本**:repo 裡的 skill 更新後,要把新檔再傳給 Hermes 並請它取代同名 skill。
 
