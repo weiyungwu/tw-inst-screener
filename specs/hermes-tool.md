@@ -6,7 +6,7 @@
 - `BASE` = `https://tw-stocks.happytoo.cc`
 - 全部端點都是 `GET`，回傳 JSON，允許跨來源（CORS `*`）。
 - 若 Worker 設定了 secret `API_TOKEN`，`/api/*` 要帶 `Authorization: Bearer <token>`；沒設定就公開。
-- 資料每個交易日 18:00、20:00、22:45（台北時間）更新。借券賣出約 22:30 才公布，所以 18:00、20:00 的出貨結果不含當天借券（見 `tw_dist`）。
+- 資料每個交易日 18:00、20:00、22:45（台北時間）更新。所有回應都帶 `cache-control: no-store`，但有些 agent 的抓取工具仍會快取同一個網址，所以呼叫時要加 `_=<時間戳記>` 參數（見下方呼叫實作），API 會忽略它。借券賣出約 22:30 才公布，所以 18:00、20:00 的出貨結果不含當天借券（見 `tw_dist`）。
 
 ## 端點總覽
 
@@ -221,8 +221,10 @@ async function call(name, args) {
   // 每個工具明確對應路徑;未知工具直接報錯,不要預設走某個端點(否則新工具忘了加會默默拿到別的資料)
   const PATHS = { tw_stock: () => `/api/stock/${args.code}`, tw_cobuy: () => `/api/cobuy?${q}`, tw_scan: () => `/api/scan?${q}`, tw_dist: () => `/api/dist?${q}` };
   if (!PATHS[name]) throw new Error(`unknown tool: ${name}`);
-  const path = PATHS[name]();
-  const r = await fetch(BASE + path, { headers });
+  // 加時間戳記讓網址每次都不同:有些抓取工具會快取同一個網址,排程每天同一時間執行時會讀到前一天的資料
+  const base = PATHS[name]();
+  const path = `${base}${base.includes('?') ? '&' : '?'}_=${Date.now()}`;
+  const r = await fetch(BASE + path, { headers, cache: 'no-store' });
   return r.json(); // 錯誤也是 JSON:{ error, ... },直接交給模型
 }
 ```
@@ -232,7 +234,9 @@ async function call(name, args) {
 ```
 你可以使用 tw_cobuy、tw_scan、tw_stock、tw_dist 四個工具查詢台股籌碼資料。
 
-- 回答前先說明資料日期:tw_cobuy 看 trading_days 最後一天,tw_scan/tw_stock 看 scan_date。
+- 回答前先說明資料日期:tw_cobuy 看 trading_days 最後一天,tw_scan/tw_stock/tw_dist 看 scan_date。
+- 核對資料日期:平日 18:30 之後應為今天,其他時間應為前一個平日。比較舊時重新呼叫一次;仍然一樣就註明「資料日期比預期舊,可能是休市日、尚未更新或讀到快取」,不可當成今天的資料描述。
+- 清單(tw_scan、tw_dist、tw_cobuy)和個股明細(tw_stock)的資料日期必須相同;不同時重抓較舊的那一份,仍不一致就說明原因,不可把兩天的資料混在同一份回答裡。
 - 注意單位:tw_cobuy 是「張」;tw_stock 的 series.inst_net 是「股」;features 單位依工具說明,比例類多為小數(0.05 = 5%)。
 - 欄位為 null 代表資料不足,要說「資料不足」,不可當成 0 推論。
 - quality 為 tdcc_warming_up 時,提醒籌碼集中分數僅供參考。
@@ -251,7 +255,7 @@ async function call(name, args) {
   → `tw_scan({ limit: 10 })`
 - 「法人同步買超和吸籌清單有哪些重疊？逐檔分析。」
   → `tw_cobuy({})` ＋ `tw_scan({ stage: ["ACCUMULATION","WATCH"], limit: 200 })` 取交集，再對每檔 `tw_stock`
-- 要產出完整的分析報告時，建議改用 Hermes skill `specs/台股籌碼資料_Skill_v1.3.md` 抓資料，再交給 `stock-4d-3d-trade-report`（規格見 `specs/stock-4d-3d-trade-report_v4.md`）產生報告。
+- 要產出完整的分析報告時，建議改用 Hermes skill `specs/台股籌碼資料_Skill_v1.4.md` 抓資料，再交給 `stock-4d-3d-trade-report`（規格見 `specs/stock-4d-3d-trade-report_v4.md`）產生報告。
 - 「今天疑似出貨風險分數最高的上櫃股？借券資料算進去了嗎？」
   → `tw_dist({ stage: ["DISTRIBUTION","CAUTION"], market: "TPEX", limit: 10 })`，並看回應的 `sbl_status`
 - 「我的持股 2330 有沒有出貨風險訊號？」
