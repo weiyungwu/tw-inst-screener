@@ -45,10 +45,11 @@ async function apiScan(env, params) {
   const minScore = Number(params.get('min_score') ?? 0);
   const limit = Math.min(Math.max(Number(params.get('limit') ?? 50) || 50, 1), 200);
 
-  const stocks = scan.stocks
-    .filter((s) => stages.includes(s.stage) && s.score >= minScore && (!market || s.market === market))
-    .slice(0, limit);
-  return json({ scan_date: scan.scan_date, updated_at: scan.updated_at, quality: scan.quality, tdcc_weeks: scan.tdcc_weeks, count: stocks.length, stocks });
+  // count 是回傳檔數、total 是符合條件的總檔數(count < total 代表被 limit 截斷)
+  const matched = scan.stocks
+    .filter((s) => stages.includes(s.stage) && s.score >= minScore && (!market || s.market === market));
+  const stocks = matched.slice(0, limit);
+  return json({ scan_date: scan.scan_date, updated_at: scan.updated_at, quality: scan.quality, tdcc_weeks: scan.tdcc_weeks, count: stocks.length, total: matched.length, stocks });
 }
 
 // GET /api/dist?stage=DISTRIBUTION,CAUTION&min_score=50&min_coverage=0.85&market=TPEX&limit=50
@@ -67,12 +68,12 @@ async function apiDist(env, params) {
   if (!(minCoverage >= 0 && minCoverage <= 1)) return json({ error: 'invalid_min_coverage', hint: 'min_coverage 必須介於 0 和 1 之間' }, 400);
   const limit = Math.min(Math.max(Number(params.get('limit') ?? 50) || 50, 1), 200);
 
-  const stocks = dist.stocks
-    .filter((s) => stages.includes(s.stage) && s.score >= minScore && s.coverage >= minCoverage && (!market || s.market === market))
-    .slice(0, limit);
+  const matched = dist.stocks
+    .filter((s) => stages.includes(s.stage) && s.score >= minScore && s.coverage >= minCoverage && (!market || s.market === market));
+  const stocks = matched.slice(0, limit);
   return json({
     scan_date: dist.scan_date, updated_at: dist.updated_at, run_id: dist.run_id, quality: dist.quality, sbl_status: dist.sbl_status,
-    config_version: dist.config_version, experimental: dist.experimental ?? null, note: dist.note, count: stocks.length, stocks,
+    config_version: dist.config_version, experimental: dist.experimental ?? null, note: dist.note, count: stocks.length, total: matched.length, stocks,
   });
 }
 
