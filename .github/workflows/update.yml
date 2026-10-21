@@ -36,7 +36,7 @@ jobs:
           TZ: Asia/Taipei
 
       - name: 上傳 data.json 到 R2
-        run: npx -y wrangler@4 r2 object put tw-stocks-data/data.json --file docs/data.json --content-type application/json --remote
+        run: scripts/r2.sh put tw-stocks-data/data.json --file docs/data.json --content-type application/json
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -49,7 +49,7 @@ jobs:
         # 首次部署要先在本機 backfill 後手動上傳,見 README。
         run: |
           mkdir -p data
-          npx -y wrangler@4 r2 object get tw-stocks-data/db/history.sqlite --file data/history.sqlite --remote
+          scripts/r2.sh get tw-stocks-data/db/history.sqlite --file data/history.sqlite
           test -s data/history.sqlite
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -69,7 +69,7 @@ jobs:
 
       - name: 上傳資料庫
         # ingest 完立刻上傳,評分失敗也不會遺失當天資料(集保 CSV 只有最新一週,錯過就補不回來)
-        run: npx -y wrangler@4 r2 object put tw-stocks-data/db/history.sqlite --file data/history.sqlite --remote
+        run: scripts/r2.sh put tw-stocks-data/db/history.sqlite --file data/history.sqlite
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -77,7 +77,7 @@ jobs:
       - name: 備份資料庫(本次寫入新的集保週)
         # 集保 CSV 只有最新一週,寫入後 DB 是唯一來源,所以每週額外留一份。保留最近 8 份,清理舊檔待辦。
         if: steps.tdcc.outputs.new_tdcc != ''
-        run: npx -y wrangler@4 r2 object put "tw-stocks-data/backups/history-${{ steps.tdcc.outputs.new_tdcc }}.sqlite" --file data/history.sqlite --remote
+        run: scripts/r2.sh put "tw-stocks-data/backups/history-${{ steps.tdcc.outputs.new_tdcc }}.sqlite" --file data/history.sqlite
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -90,9 +90,9 @@ jobs:
 
       - name: 上傳 scan 結果
         run: |
-          npx -y wrangler@4 r2 object put tw-stocks-data/scan.json --file docs/scan.json --content-type application/json --remote
+          scripts/r2.sh put tw-stocks-data/scan.json --file docs/scan.json --content-type application/json
           for f in data/features/*.json; do
-            npx -y wrangler@4 r2 object put "tw-stocks-data/features/$(basename "$f")" --file "$f" --content-type application/json --remote
+            scripts/r2.sh put "tw-stocks-data/features/$(basename "$f")" --file "$f" --content-type application/json
           done
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -105,7 +105,7 @@ jobs:
         continue-on-error: true
         run: |
           test -s docs/dist.json || { echo "::warning::本次出貨評分失敗,沒有產生 docs/dist.json"; exit 1; }
-          npx -y wrangler@4 r2 object put tw-stocks-data/dist.json --file docs/dist.json --content-type application/json --remote
+          scripts/r2.sh put tw-stocks-data/dist.json --file docs/dist.json --content-type application/json
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

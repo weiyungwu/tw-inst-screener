@@ -20,12 +20,12 @@ async function r2Response(env, key) {
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
   headers.set('etag', obj.httpEtag);
-  headers.set('cache-control', 'no-cache');
+  headers.set('cache-control', 'no-store'); // 每天會更新;no-cache 允許「存起來再確認」,有些 agent 的抓取工具存了就不確認,改成不准存
   return new Response(obj.body, { headers });
 }
 
 const json = (body, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-cache', ...CORS } });
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS } });
 
 async function readJson(env, key) {
   const obj = await env.DATA.get(key);

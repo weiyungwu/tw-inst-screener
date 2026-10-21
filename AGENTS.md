@@ -43,8 +43,10 @@ node scripts/verify-scan.mjs --stats   # 各表日期數、缺漏與最近的 in
 ## 資料庫
 - R2 的 `db/history.sqlite` 是**正本**，workflow 每天下載 → 補資料 → 上傳。本機 `data/history.sqlite` 只是工作副本。
 - **不要把本機 DB 上傳覆蓋 R2**，除非使用者明確要求；上傳前先比對兩邊各表的最新日期，並確認沒有 workflow 正在執行（否則會被它結束時的上傳蓋掉）。
+- workflow 存取 R2 一律用 `scripts/r2.sh put|get …`（暫時性錯誤會重試 2 次），不要直接寫 `npx wrangler r2 object`。
+- API 與 JSON 回應是 `cache-control: no-store`；agent 端呼叫時另外加 `_=<時間戳記>` 參數避免抓取工具快取（見 `specs/hermes-tool.md`）。
 - 要用最新資料時，從 R2 下載：`npx wrangler r2 object get tw-stocks-data/db/history.sqlite --file data/history.sqlite --remote`。
-- 改 API 回應欄位時，同步更新 `specs/hermes-tool.md` 與 `specs/台股籌碼資料_Skill_v1.3.md`。
+- 改 API 回應欄位時，同步更新 `specs/hermes-tool.md` 與 `specs/台股籌碼資料_Skill_v1.4.md`。
 
 ## 用語（網頁、API、skill 都適用）
 - 出貨相關一律稱「**疑似出貨風險訊號**」，不寫「主力正在出貨」；借券不等於放空，法人賣超不等於主力做空。
