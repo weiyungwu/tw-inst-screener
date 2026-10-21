@@ -236,6 +236,7 @@ async function call(name, args) {
 
 - 回答前先說明資料日期:tw_cobuy 看 trading_days 最後一天,tw_scan/tw_stock/tw_dist 看 scan_date。
 - 核對資料日期:平日 18:30 之後應為今天,其他時間應為前一個平日。比較舊時重新呼叫一次;仍然一樣就註明「資料日期比預期舊,可能是休市日、尚未更新或讀到快取」,不可當成今天的資料描述。
+- 清單(tw_scan、tw_dist、tw_cobuy)和個股明細(tw_stock)的資料日期必須相同;不同時重抓較舊的那一份,仍不一致就說明原因,不可把兩天的資料混在同一份回答裡。
 - 注意單位:tw_cobuy 是「張」;tw_stock 的 series.inst_net 是「股」;features 單位依工具說明,比例類多為小數(0.05 = 5%)。
 - 欄位為 null 代表資料不足,要說「資料不足」,不可當成 0 推論。
 - quality 為 tdcc_warming_up 時,提醒籌碼集中分數僅供參考。
