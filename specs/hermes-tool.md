@@ -53,7 +53,7 @@
 ```
 
 - 單位是**張**（股數 ÷ 1000），正數為買超。`*_daily` 和 `trading_days` 一一對應，由舊到新。
-- `count` 是符合的總檔數，`stocks` 最多 `limit` 檔。
+- `count` 是符合的總檔數，`stocks` 最多 `limit` 檔。（注意：`/api/scan`、`/api/dist` 的總檔數是 `total`，`count` 是回傳檔數。）
 
 ## 2. `tw_scan` — 吸籌掃描清單
 
@@ -66,7 +66,9 @@
 | `market` | 全部 | `TWSE`、`TPEX` |
 | `limit` | 50 | 最多 200 |
 
-回應：`{ scan_date, updated_at, quality, tdcc_weeks, count, stocks: [...] }`。每檔有 `score`、`stage`、`breakdown`、`signals`、`features`、`close`、`lights`，依分數由高到低排序。
+回應：`{ scan_date, updated_at, quality, tdcc_weeks, count, total, stocks: [...] }`。每檔有 `score`、`stage`、`breakdown`、`signals`、`features`、`close`、`lights`，依分數由高到低排序。
+
+- `count` 是這次回傳的檔數，`total` 是符合條件的總檔數。`count < total` 代表分數較低的股票被 `limit` 截掉了（預設只回 50 檔），要完整清單就加大 `limit`（最多 200）；只查單檔改用 `tw_stock`。
 
 - `quality` 為 `"tdcc_warming_up"` 時，集保資料不足 4 週，籌碼集中分數僅供參考，回答時要提醒。
 - `breakdown`：`inst` 法人緩買（滿分 30）、`concentration` 籌碼集中（30）、`price` 價格未動（20）、`volume` 量能溫和（10）、`margin` 融資退場（10）。
@@ -124,7 +126,7 @@
 | `market` | 全部 | `TWSE`、`TPEX`（掃描日當天所屬市場） |
 | `limit` | 50 | 最多 200 |
 
-回應：`{ scan_date, updated_at, run_id, quality, sbl_status, config_version, experimental, note, count, stocks: [...] }`。每檔有 `score`、`coverage`、`stage`、`breakdown`、`signals`、`features`、`close`、`lights`、`bear_lights`，依階段、分數排序。尚未產生時回 `503 { "error": "dist_not_ready" }`。
+回應：`{ scan_date, updated_at, run_id, quality, sbl_status, config_version, experimental, note, count, total, stocks: [...] }`。`count`、`total` 的意思同 `tw_scan`。每檔有 `score`、`coverage`、`stage`、`breakdown`、`signals`、`features`、`close`、`lights`、`bear_lights`，依階段、分數排序。尚未產生時回 `503 { "error": "dist_not_ready" }`。
 
 - **用語**：一律稱「疑似出貨風險訊號」。官方資料只能確認「法人淨賣出」「借券餘額增加」這類事實，不能證明是誰在賣、為什麼賣。
 - **解讀期間（`experimental: true`，依 2026-04～10 回測）**：名單之後 **20 日**平均落後同期個股約 2%；**5 日幾乎沒有差異**；期間內最大上漲幅度和其他個股相同。只能當 20 日左右的風險提示，**不能當放空時點**。
@@ -255,7 +257,7 @@ async function call(name, args) {
   → `tw_scan({ limit: 10 })`
 - 「法人同步買超和吸籌清單有哪些重疊？逐檔分析。」
   → `tw_cobuy({})` ＋ `tw_scan({ stage: ["ACCUMULATION","WATCH"], limit: 200 })` 取交集，再對每檔 `tw_stock`
-- 要產出完整的分析報告時，建議改用 Hermes skill `specs/台股籌碼資料_Skill_v1.4.md` 抓資料，再交給 `stock-4d-3d-trade-report`（規格見 `specs/stock-4d-3d-trade-report_v4.md`）產生報告。
+- 要產出完整的分析報告時，建議改用 Hermes skill `specs/台股籌碼資料_Skill_v1.5.md` 抓資料，再交給 `stock-4d-3d-trade-report`（規格見 `specs/stock-4d-3d-trade-report_v4.md`）產生報告。
 - 「今天疑似出貨風險分數最高的上櫃股？借券資料算進去了嗎？」
   → `tw_dist({ stage: ["DISTRIBUTION","CAUTION"], market: "TPEX", limit: 10 })`，並看回應的 `sbl_status`
 - 「我的持股 2330 有沒有出貨風險訊號？」
