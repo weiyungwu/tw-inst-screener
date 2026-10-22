@@ -29,6 +29,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          check-latest: true
 
       - name: 抓取並產生 data.json
         run: node scripts/build-data.mjs
